@@ -39,14 +39,25 @@ PROFILES = {
 transcribe_kwargs = PROFILES["stable"]
 
 def load_model(lang: str):
-    model_path = f"./models/{lang}"
+    if lang == "auto":
+        # For auto language detection, use English model as base multilingual model
+        model_path = "./models/en"
+    else:
+        model_path = f"./models/{lang}"
+    
     global model
     model = WhisperModel(
         model_path,
         device="cuda",
         compute_type="float16"
     )
-    lang_code = lang if lang in ["en", "ru", "he"] else "he"
+    
+    if lang == "auto":
+        # Set language to None for auto-detection
+        lang_code = None
+    else:
+        lang_code = lang if lang in ["en", "ru", "he"] else "he"
+    
     for profile in PROFILES.values():
         profile["language"] = lang_code
 
@@ -187,7 +198,7 @@ def fix_rtl_punctuation(text: str, is_hebrew: bool = True) -> str:
     punctuation_marks = r'[.!?,:;]'
     
     # Add RLM after punctuation for correct display
-    text = re.sub(f'({punctuation_marks})(\s+)', r'\1' + RLM + r'\2', text)
+    text = re.sub(f'({punctuation_marks})(\\s+)', r'\1' + RLM + r'\2', text)
     
     # Fix number issues - add LRM around English numbers
     text = re.sub(r'(\d+)', LRM + r'\1' + LRM, text)
@@ -231,8 +242,43 @@ class ToSubs:
     def __init__(self, times, lang, fix_rtl=False):
         self.times = times
         self.last_idx = len(times) - 1
-        self.is_heb = lang == "he"
+        # For auto language detection, we need to detect Hebrew text
+        if lang == "auto":
+            # Try to detect Hebrew in the text
+            sample_text = ""
+            for i in range(min(10, len(times))):  # Sample first 10 words
+                if i in times:
+                    sample_text += times[i].get('word', '') + " "
+            self.is_heb = self._detect_hebrew(sample_text)
+        else:
+            self.is_heb = lang == "he"
         self.fix_rtl = fix_rtl and self.is_heb  # Apply RTL only for Hebrew
+    
+    def _detect_hebrew(self, text: str) -> bool:
+        """Simple Hebrew detection based on Unicode ranges"""
+        if not text:
+            return False
+        hebrew_chars = 0
+        latin_chars = 0
+        total_chars = 0
+        
+        for char in text:
+            if char.isalpha():
+                total_chars += 1
+                # Hebrew Unicode range: U+0590 to U+05FF
+                if '\u0590' <= char <= '\u05FF':
+                    hebrew_chars += 1
+                # Latin characters (English)
+                elif 'a' <= char.lower() <= 'z':
+                    latin_chars += 1
+        
+        if total_chars == 0:
+            return False
+        
+        # If Hebrew chars are more than 50% or 
+        # Hebrew chars are more than Latin chars, consider it Hebrew text
+        hebrew_ratio = hebrew_chars / total_chars
+        return hebrew_ratio > 0.5 or (hebrew_chars > latin_chars and hebrew_ratio > 0.2)
 
     def run(self):
         if not ADVANCED_SRT_AVAILABLE:
