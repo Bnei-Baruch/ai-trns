@@ -56,6 +56,7 @@ def load_model(lang: str):
         # Set language to None for auto-detection
         lang_code = None
     else:
+        # he_bb should use "he" as language code but different model path
         lang_code = lang if lang in ["en", "ru", "he"] else "he"
     
     for profile in PROFILES.values():
@@ -251,7 +252,7 @@ class ToSubs:
                     sample_text += times[i].get('word', '') + " "
             self.is_heb = self._detect_hebrew(sample_text)
         else:
-            self.is_heb = lang == "he"
+            self.is_heb = lang in ["he", "he_bb"]
         self.fix_rtl = fix_rtl and self.is_heb  # Apply RTL only for Hebrew
     
     def _detect_hebrew(self, text: str) -> bool:

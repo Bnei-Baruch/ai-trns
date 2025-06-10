@@ -136,7 +136,7 @@ def main():
     parser.add_argument("--profile", choices=["stable", "fast"], default="stable", help="Quality profile: stable or fast")
     parser.add_argument("--keep-wav", action="store_true", help="Don't delete temporary output.wav after transcription")
     parser.add_argument("--rtf", type=float, default=40.0, help="Expected processing speed (x real-time), e.g. 40 for RTX A5000")
-    parser.add_argument("--lang", choices=["en", "he", "he_old", "ru", "auto"], default="he", help="Model language: en, he, he_old, ru, auto")
+    parser.add_argument("--lang", choices=["en", "he", "he_old", "he_bb", "ru", "auto"], default="he", help="Model language: en, he, he_old, he_bb, ru, auto")
     args = parser.parse_args()
 
     # Load the required model by language
@@ -184,7 +184,7 @@ def main():
             def transcribe_task():
                 return transcribe_file_to_advanced_srt(wav_file, args.lang, args.fix_rtl)
             impl_name = "advanced"
-            if args.fix_rtl and (args.lang == "he" or args.lang == "auto"):
+            if args.fix_rtl and (args.lang == "he" or args.lang == "he_bb" or args.lang == "auto"):
                 impl_name += " with RTL fixes"
         
         print(f"[i] Using {impl_name} SRT implementation")
