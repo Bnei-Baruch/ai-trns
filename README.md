@@ -111,5 +111,4 @@ python whisper_fullfile_cli.py --input audio.mp3 --srt --lang ru
 
 - `he` - Hebrew (recommended for --impl 2)
 - `ru` - Russian  
-- `en` - English
-- `he_old` - old Hebrew model 
+- `en` - English 
