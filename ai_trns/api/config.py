@@ -34,3 +34,8 @@ ALLOWED_URL_HOSTS = _list("AI_TRNS_ALLOWED_URL_HOSTS")
 # A job is given to workers at most this many times (lost workers, expired leases)
 MAX_ATTEMPTS = int(os.environ.get("AI_TRNS_MAX_ATTEMPTS", "3"))
 JOB_TTL_HOURS = float(os.environ.get("AI_TRNS_JOB_TTL_HOURS", "72"))
+
+# Human review of STT (ai_trns.api.review): sets, lessons and results as JSON files
+REVIEW_DIR = os.environ.get("AI_TRNS_REVIEW_DIR", "./review")
+# The model reviewers are told they review; default: the model of the newest transcribed lesson
+REVIEW_MODEL = os.environ.get("AI_TRNS_REVIEW_MODEL", "")

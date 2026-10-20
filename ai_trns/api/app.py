@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, Response
 
 from .. import audio, protocol
 from ..subtitles import FORMATS, render
-from . import config
+from . import config, review
 from .auth import Principal, can_see, principal
 from .jobs import CANCELLED, DONE, ERROR, QUEUED, RUNNING, JobStore
 
@@ -51,6 +51,10 @@ async def lifespan(app: FastAPI):
                 log.warning("job %s: lease expired, now %s", job_id, job["status"])
                 if job["status"] == ERROR:
                     drop_upload(job_id)
+            try:
+                review.sync_all(store)
+            except Exception:
+                log.exception("review: sync failed")
             if time.time() - last_cleanup > 3600:
                 last_cleanup = time.time()
                 removed = store.cleanup()
@@ -67,7 +71,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ai-trns", lifespan=lifespan)
 if config.CORS_ORIGINS:
     app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS,
-                       allow_methods=["GET", "POST", "DELETE"], allow_headers=["*"])
+                       allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["*"])
+app.include_router(review.router)
 
 
 def require_worker(request: Request):
