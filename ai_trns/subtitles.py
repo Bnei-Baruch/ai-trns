@@ -1,10 +1,9 @@
-from faster_whisper import WhisperModel
-from tempfile import NamedTemporaryFile
-import wave
-import numpy as np
-from typing import Iterator
-from datetime import timedelta
+"""Rendering Whisper segments to text / SRT"""
+import os
 import re
+from datetime import timedelta
+from tempfile import NamedTemporaryFile
+from typing import Optional
 
 # Adding new imports for advanced SRT generation
 try:
@@ -15,89 +14,22 @@ except ImportError:
     ADVANCED_SRT_AVAILABLE = False
     print("[!] To use advanced SRT generation, install: pip install pysrt")
 
-model = None  # Will be initialized via load_model()
 
-PROFILES = {
-    "fast": dict(
-        language="he",
-        vad_filter=True,
-        beam_size=3,
-        temperature=[0.0],
-        no_speech_threshold=0.5
-    ),
-    "stable": dict(
-        language="he",
-        vad_filter=False,
-        beam_size=8,
-        temperature=[0.0, 0.2],
-        no_speech_threshold=0.7,
-        logprob_threshold=-1.0,
-        compression_ratio_threshold=2.4
-    )
-}
-
-transcribe_kwargs = PROFILES["stable"]
-
-def load_model(lang: str):
-    if lang == "auto":
-        # For auto language detection, use English model as base multilingual model
-        model_path = "./models/en"
-    else:
-        model_path = f"./models/{lang}"
-    
-    global model
-    model = WhisperModel(
-        model_path,
-        device="cuda",
-        compute_type="float16"
-    )
-    
-    if lang == "auto":
-        # Set language to None for auto-detection
-        lang_code = None
-    else:
-        lang_code = lang
-    
-    for profile in PROFILES.values():
-        profile["language"] = lang_code
-
-def transcribe_file(filename: str) -> str:
-    segments, _ = model.transcribe(filename, **transcribe_kwargs)
+def segments_to_text(segments) -> str:
     return " ".join([s.text.strip() for s in segments])
 
-def transcribe_file_to_srt(filename: str, max_segment_length: float = 10.0) -> str:
-    segments, _ = model.transcribe(filename, **transcribe_kwargs)
-    return format_segments_to_srt(segments, max_segment_length=max_segment_length)
 
-def transcribe_array_to_text(audio_array: np.ndarray) -> str:
-    segments, _ = model.transcribe(audio_array, **transcribe_kwargs)
-    return " ".join([s.text.strip() for s in segments])
+def render(segments, fmt: str, lang: str, impl: int = 2, fix_rtl: bool = False) -> str:
+    """fmt: txt | srt; impl: 1 = standard SRT, 2 = advanced SRT (needs word timestamps)"""
+    if fmt == "txt":
+        return segments_to_text(segments)
+    if impl == 2 and ADVANCED_SRT_AVAILABLE:
+        content = segments_to_advanced_srt(segments, lang, fix_rtl)
+        if content is not None:
+            return content
+        print("[!] Could not get word timestamps, using standard generation")
+    return format_segments_to_srt(segments)
 
-def transcribe_array_to_srt(audio_array: np.ndarray, max_segment_length: float = 10.0) -> str:
-    segments, _ = model.transcribe(audio_array, **transcribe_kwargs)
-    return format_segments_to_srt(segments, max_segment_length=max_segment_length)
-
-def transcribe_stream(byte_stream: Iterator[bytes],
-                      chunk_duration_sec: float = 6.0,
-                      sample_rate: int = 16000,
-                      bytes_per_sample: int = 2) -> Iterator[str]:
-    buffer = b""
-    threshold = int(chunk_duration_sec * sample_rate * bytes_per_sample)
-
-    for chunk in byte_stream:
-        buffer += chunk
-        if len(buffer) >= threshold:
-            with NamedTemporaryFile(suffix=".wav", delete=True) as f:
-                with wave.open(f.name, "wb") as wf:
-                    wf.setnchannels(1)
-                    wf.setsampwidth(bytes_per_sample)
-                    wf.setframerate(sample_rate)
-                    wf.writeframes(buffer)
-
-                buffer = b""
-
-                segments, _ = model.transcribe(f.name, **transcribe_kwargs)
-                yield " ".join([s.text.strip() for s in segments])
 
 def split_segment_text_by_words(text, parts, min_words_per_chunk=2):
     words = text.strip().split()
@@ -428,26 +360,8 @@ class ToSubs:
         return n_start - max(0.1, (n_start - end) / 2)
 
 
-def transcribe_file_to_advanced_srt(filename: str, lang: str = "he", fix_rtl: bool = False) -> str:
-    """
-    Advanced SRT generation with pause, punctuation and context analysis
-    Uses logic from the second mdb-ai project
-    
-    Args:
-        filename: path to audio file
-        lang: transcription language
-        fix_rtl: fix RTL punctuation issues (for Hebrew)
-    """
-    if not ADVANCED_SRT_AVAILABLE:
-        print("[!] pysrt not available, using standard SRT generation")
-        return transcribe_file_to_srt(filename)
-    
-    # Use transcription settings with word_timestamps
-    kwargs = transcribe_kwargs.copy()
-    kwargs['word_timestamps'] = True
-    
-    segments, _ = model.transcribe(filename, **kwargs)
-    
+def segments_to_advanced_srt(segments, lang: str, fix_rtl: bool) -> Optional[str]:
+    """Build advanced SRT from segments with words; None if there are no word timestamps"""
     # Convert segments to format expected by ToSubs
     word_timestamps = {}
     idx = 0
@@ -462,8 +376,7 @@ def transcribe_file_to_advanced_srt(filename: str, lang: str = "he", fix_rtl: bo
                 idx += 1
     
     if not word_timestamps:
-        print("[!] Could not get word timestamps, using standard generation")
-        return transcribe_file_to_srt(filename)
+        return None
     
     # Generate SRT through ToSubs with RTL fixes
     to_subs = ToSubs(word_timestamps, lang, fix_rtl=fix_rtl)
@@ -479,11 +392,9 @@ def transcribe_file_to_advanced_srt(filename: str, lang: str = "he", fix_rtl: bo
     try:
         with open(temp_file.name, 'r', encoding='utf-8') as f:
             content = f.read()
-        import os
         os.unlink(temp_file.name)
         return content
     except Exception as e:
         print(f"[!] Error reading SRT file: {e}")
         # Fallback to previous method
         return '\n'.join(str(item) for item in srt_file)
-
