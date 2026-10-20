@@ -1,6 +1,8 @@
 __pycache__/
 *.pyc
+.pytest_cache/
 models/
 jobs/
+work/
 output.*
 report_*.log

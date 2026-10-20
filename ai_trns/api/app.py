@@ -14,13 +14,14 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
 
-from fastapi import Body, Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 
 from .. import audio, protocol
 from ..subtitles import FORMATS, render
 from . import config
+from .auth import Principal, can_see, principal
 from .jobs import CANCELLED, DONE, ERROR, QUEUED, RUNNING, JobStore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -35,8 +36,8 @@ WORKER_SEEN_S = 300
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if not config.API_KEY:
-        log.warning("AI_TRNS_API_KEY is not set: API is open without auth")
+    if not config.OIDC_ISSUER and not config.API_KEYS:
+        log.warning("neither AI_TRNS_OIDC_ISSUER nor API keys are set: API is open without auth")
     if not config.WORKER_KEY:
         log.warning("AI_TRNS_WORKER_KEY is not set: no worker can connect")
     store = JobStore()
@@ -69,16 +70,6 @@ if config.CORS_ORIGINS:
                        allow_methods=["GET", "POST", "DELETE"], allow_headers=["*"])
 
 
-def require_key(x_api_key: Optional[str] = Header(None), authorization: Optional[str] = Header(None)):
-    if not config.API_KEY:
-        return
-    token = x_api_key
-    if not token and authorization and authorization.lower().startswith("bearer "):
-        token = authorization[7:]
-    if not token or not secrets.compare_digest(token, config.API_KEY):
-        raise HTTPException(401, "invalid or missing API key")
-
-
 def require_worker(request: Request):
     key = request.headers.get(protocol.KEY_HEADER, "")
     if not config.WORKER_KEY or not secrets.compare_digest(key, config.WORKER_KEY):
@@ -89,15 +80,16 @@ def require_worker(request: Request):
 
 
 def job_view(job: dict) -> dict:
-    view = {k: job[k] for k in ("id", "status", "stage", "progress", "params", "error",
+    view = {k: job[k] for k in ("id", "status", "stage", "progress", "params", "error", "owner",
                                 "worker", "attempts", "created", "started", "finished")}
     view["queue_position"] = app.state.store.queue_position(job["id"])
     return view
 
 
-def get_job(job_id: str) -> dict:
+def get_job(job_id: str, who: Principal) -> dict:
     job = app.state.store.get(job_id)
-    if job is None:
+    # someone else's job looks the same as a missing one
+    if job is None or not can_see(who, job):
         raise HTTPException(404, "job not found")
     return job
 
@@ -134,8 +126,9 @@ def health():
 
 # --- clients ---
 
-@app.post("/jobs", status_code=202, dependencies=[Depends(require_key)])
+@app.post("/jobs", status_code=202)
 def create_job(
+    who: Principal = Depends(principal),
     file: Optional[UploadFile] = File(None),
     url: Optional[str] = Form(None),
     lang: Literal["en", "he", "ru", "auto"] = Form("he"),
@@ -169,20 +162,27 @@ def create_job(
         raise
 
     params = {"lang": lang, "formats": formats, "profile": profile, "fix_rtl": fix_rtl}
-    store.create(params, source, job_id)
+    store.create(params, source, job_id, owner=who.owner)
+    log.info("job %s created by %s", job_id, who.name)
     return job_view(store.get(job_id))
 
 
-@app.get("/jobs/{job_id}", dependencies=[Depends(require_key)])
-def job_status(job_id: str):
-    return job_view(get_job(job_id))
+@app.get("/jobs")
+def list_jobs(who: Principal = Depends(principal), limit: int = Query(50, ge=1, le=500)):
+    """The caller's jobs, newest first (everyone's for admins and services)"""
+    return [job_view(job) for job in app.state.store.list(None if who.sees_all else who.owner, limit)]
 
 
-@app.get("/jobs/{job_id}/result", dependencies=[Depends(require_key)])
+@app.get("/jobs/{job_id}")
+def job_status(job_id: str, who: Principal = Depends(principal)):
+    return job_view(get_job(job_id, who))
+
+
+@app.get("/jobs/{job_id}/result")
 def job_result(job_id: str, format: Optional[Literal["txt", "srt", "json"]] = None,
-               fix_rtl: Optional[bool] = None):
+               fix_rtl: Optional[bool] = None, who: Principal = Depends(principal)):
     """The result as rendered when the job finished, or rendered now from the job's words"""
-    job = get_job(job_id)
+    job = get_job(job_id, who)
     if job["status"] != DONE:
         raise HTTPException(409, f"job is {job['status']}")
     params = job["params"]
@@ -198,18 +198,18 @@ def job_result(job_id: str, format: Optional[Literal["txt", "srt", "json"]] = No
                     headers={"Content-Disposition": f'attachment; filename="{job_id}.{fmt}"'})
 
 
-@app.delete("/jobs/{job_id}", dependencies=[Depends(require_key)])
-def cancel_job(job_id: str):
+@app.delete("/jobs/{job_id}")
+def cancel_job(job_id: str, who: Principal = Depends(principal)):
     """A running job's worker learns about it on its next heartbeat"""
-    job = get_job(job_id)
+    job = get_job(job_id, who)
     if job["status"] not in (QUEUED, RUNNING):
         raise HTTPException(409, "job is already finished")
     app.state.store.update(job_id, status=CANCELLED, finished=time.time())
     drop_upload(job_id)
-    return job_view(get_job(job_id))
+    return job_view(get_job(job_id, who))
 
 
-@app.post("/render", dependencies=[Depends(require_key)])
+@app.post("/render", dependencies=[Depends(principal)])
 def render_words(doc: dict = Body(..., description="words document, as GET /jobs/{id}/result?format=json returns"),
                  format: Literal["txt", "srt", "json"] = "srt",
                  fix_rtl: bool = False):

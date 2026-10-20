@@ -32,6 +32,7 @@ class JobStore:
                 params TEXT NOT NULL,
                 source TEXT NOT NULL,
                 error TEXT,
+                owner TEXT,
                 worker TEXT,
                 lease_until REAL,
                 attempts INTEGER NOT NULL DEFAULT 0,
@@ -41,7 +42,8 @@ class JobStore:
             )""")
         # Databases from before workers were separate lack the lease columns
         columns = {r["name"] for r in self.db.execute("PRAGMA table_info(jobs)")}
-        for name, ddl in (("worker", "TEXT"), ("lease_until", "REAL"), ("attempts", "INTEGER NOT NULL DEFAULT 0")):
+        for name, ddl in (("owner", "TEXT"), ("worker", "TEXT"), ("lease_until", "REAL"),
+                          ("attempts", "INTEGER NOT NULL DEFAULT 0")):
             if name not in columns:
                 self.db.execute(f"ALTER TABLE jobs ADD COLUMN {name} {ddl}")
         self.db.commit()
@@ -49,13 +51,13 @@ class JobStore:
     def job_dir(self, job_id: str) -> str:
         return os.path.join(self.jobs_dir, job_id)
 
-    def create(self, params: dict, source: str, job_id: Optional[str] = None) -> str:
+    def create(self, params: dict, source: str, job_id: Optional[str] = None, owner: Optional[str] = None) -> str:
         job_id = job_id or uuid.uuid4().hex
         os.makedirs(self.job_dir(job_id), exist_ok=True)
         with self.lock:
             self.db.execute(
-                "INSERT INTO jobs (id, status, params, source, created) VALUES (?, ?, ?, ?, ?)",
-                (job_id, QUEUED, json.dumps(params), source, time.time()))
+                "INSERT INTO jobs (id, status, params, source, owner, created) VALUES (?, ?, ?, ?, ?, ?)",
+                (job_id, QUEUED, json.dumps(params), source, owner, time.time()))
             self.db.commit()
         return job_id
 
@@ -73,6 +75,14 @@ class JobStore:
         with self.lock:
             self.db.execute(f"UPDATE jobs SET {cols} WHERE id = ?", (*fields.values(), job_id))
             self.db.commit()
+
+    def list(self, owner: Optional[str] = None, limit: int = 50) -> list:
+        """Newest first; owner None = everyone's"""
+        where, args = ("WHERE owner = ?", (owner,)) if owner is not None else ("", ())
+        with self.lock:
+            rows = self.db.execute(f"SELECT id FROM jobs {where} ORDER BY created DESC LIMIT ?",
+                                   (*args, limit)).fetchall()
+        return [self.get(r["id"]) for r in rows]
 
     def queued_ids(self) -> list:
         with self.lock:

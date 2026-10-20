@@ -23,7 +23,8 @@ def audio_file(tmp_path):
 def api_config(tmp_path, monkeypatch):
     from ai_trns.api import config
     monkeypatch.setattr(config, "JOBS_DIR", str(tmp_path / "jobs"))
-    monkeypatch.setattr(config, "API_KEY", API_KEY)
+    monkeypatch.setattr(config, "API_KEYS", {"tests": API_KEY})
+    monkeypatch.setattr(config, "OIDC_ISSUER", "")
     monkeypatch.setattr(config, "WORKER_KEY", WORKER_KEY)
     monkeypatch.setattr(config, "ALLOWED_URL_HOSTS", ["cdn.example.org"])
     return config

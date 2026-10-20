@@ -51,11 +51,22 @@ RTX 2080 ~95×.
 
 ## API
 
-Client key: `X-API-Key: <key>` or `Authorization: Bearer <key>`.
+### Authorization
+
+- **Users** send a Keycloak access token: `Authorization: Bearer <token>` (as ai-tools does with `kc.token`).
+  The API checks the signature against the issuer's keys, expiry, the client (`azp` in `AI_TRNS_OIDC_CLIENTS`)
+  and the realm role `AI_TRNS_OIDC_ROLE`. A user sees only their own jobs (others' are 404), except with
+  `AI_TRNS_ADMIN_ROLE`.
+- **Services** send a named key: `X-API-Key: <key>` or `Authorization: Bearer <key>`. Keys are listed as
+  `AI_TRNS_API_KEYS=name:key,...`, so one service's key can be revoked alone. Services see all jobs.
+- **Workers** use their own key (`AI_TRNS_WORKER_KEY`) on `/worker/*` only.
+
+Each job records its `owner` (`user:<sub>` or `key:<name>`). With no issuer and no keys configured the API is open.
 
 | Method | Path | |
 |---|---|---|
 | `POST` | `/jobs` | multipart: `file` **or** `url`, `lang` (`he`, `en`, `ru`, `auto`), `format` (comma-separated `srt`, `txt`, `json`), `profile`, `fix_rtl` → `202` + job |
+| `GET` | `/jobs?limit=50` | the caller's jobs, newest first |
 | `GET` | `/jobs/{id}` | `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage`, `progress` 0..1, `queue_position`, `worker`, `attempts`, `error` |
 | `GET` | `/jobs/{id}/result?format=srt&fix_rtl=` | result; any format, also one not asked for, is rendered from the job's words |
 | `DELETE` | `/jobs/{id}` | cancel (a running job stops at the worker's next heartbeat) |
@@ -77,7 +88,11 @@ API (`ai-trns-api.env`):
 | Variable | Default | |
 |---|---|---|
 | `AI_TRNS_HOST` / `AI_TRNS_PORT` | `127.0.0.1` / `8000` | |
-| `AI_TRNS_API_KEY` | empty | empty = **no client auth** (a warning is logged) |
+| `AI_TRNS_OIDC_ISSUER` | empty | Keycloak realm URL, e.g. `https://accounts.kab.info/auth/realms/main`; empty = no user tokens |
+| `AI_TRNS_OIDC_CLIENTS` | empty | accepted `azp` (Keycloak clients), e.g. `ai-tools`; empty = any |
+| `AI_TRNS_OIDC_ROLE` | empty | realm role users must have, e.g. `bb_user`; empty = any user |
+| `AI_TRNS_ADMIN_ROLE` | empty | realm role that sees every job |
+| `AI_TRNS_API_KEYS` | empty | service keys `name:key,...`; `AI_TRNS_API_KEY` adds one named `default` |
 | `AI_TRNS_WORKER_KEY` | empty | required for workers to connect |
 | `AI_TRNS_JOBS_DIR` | `./jobs` | `jobs/<id>/` per job + `jobs.sqlite` |
 | `AI_TRNS_ALLOWED_URL_HOSTS` | empty | hosts allowed for `url`; empty = URL input disabled |
