@@ -13,6 +13,7 @@ print("[DEBUG] Starting from directory:", os.getcwd())
 print("[DEBUG] Launch arguments:", sys.argv)
 
 from ai_trns import audio
+from ai_trns.subtitles import render
 from ai_trns.transcriber import Transcriber
 
 report_file = "report_python.log"
@@ -47,9 +48,10 @@ def copy_to_nginx(src: str, dest_dir: str):
 
 
 def run(args):
-    formats = [fmt for fmt in ("txt", "srt") if getattr(args, fmt)]
+    formats = [fmt for fmt in ("txt", "srt", "json") if getattr(args, fmt)]
     if not formats:
-        raise RuntimeError("nothing to do: pass --txt and/or --srt")
+        raise RuntimeError("nothing to do: pass --txt, --srt and/or --json")
+    srt_style = args.srt_style or ("standard" if args.impl == 1 else "advanced")
 
     # Load the required model by language
     transcriber = Transcriber(args.lang, args.models_dir)
@@ -71,8 +73,8 @@ def run(args):
         expected_sec = 4.5 * (duration / args.rtf)
         report(f"[~] Expected transcription time: {fmt_time(expected_sec)}")
         if "srt" in formats:
-            impl_name = "standard" if args.impl == 1 else "advanced"
-            if args.impl == 2 and args.fix_rtl and args.lang in ("he", "auto"):
+            impl_name = srt_style
+            if srt_style != "standard" and args.fix_rtl and args.lang in ("he", "auto"):
                 impl_name += " with RTL fixes"
             report(f"[i] Using {impl_name} SRT implementation")
         report("[~] Transcribing... (this may take several minutes)")
@@ -83,8 +85,7 @@ def run(args):
             percent = int(p * 100)
             report(f"\r[Whisper] [{bar(percent)}] {percent}% - {int(time.time() - start)} sec", end="")
 
-        results = transcriber.transcribe(wav_file, formats, args.profile, args.impl, args.fix_rtl,
-                                         on_progress=whisper_progress)
+        doc = transcriber.transcribe(wav_file, args.profile, args.batch_size, on_progress=whisper_progress)
         actual_time = time.time() - start
         report(f"\r[Whisper] [{bar(100)}] 100% - {int(actual_time)} sec")
     finally:
@@ -97,7 +98,7 @@ def run(args):
     for fmt in formats:
         out_file = os.path.join(args.out_dir, f"output.{fmt}")
         with open(out_file, "w", encoding="utf-8") as f:
-            f.write(results[fmt])
+            f.write(render(doc, fmt, srt_style, args.fix_rtl))
         report(f"[✓] Saved to {out_file} (actual time: {fmt_time(actual_time)})")
         copy_to_nginx(out_file, args.nginx_dir)
 
@@ -108,9 +109,12 @@ def main():
     parser.add_argument("--input", required=True, help="Path to audio file or URL (mp3, m4a, flac, wav, ...)")
     parser.add_argument("--txt", action="store_true", help="Save result to output.txt")
     parser.add_argument("--srt", action="store_true", help="Save result to output.srt")
+    parser.add_argument("--json", action="store_true", help="Save words with timecodes to output.json")
     parser.add_argument("--impl", type=int, choices=[1, 2], default=2, help="SRT implementation: 1=standard, 2=advanced with pause and punctuation analysis")
-    parser.add_argument("--fix-rtl", action="store_true", help="Fix RTL punctuation issues for Hebrew (only for --impl 2)")
-    parser.add_argument("--profile", choices=["stable", "fast"], default="stable", help="Quality profile: stable or fast")
+    parser.add_argument("--srt-style", choices=["house", "advanced", "standard"], help="SRT layout; overrides --impl (house = whisper_trainer cue policy)")
+    parser.add_argument("--fix-rtl", action="store_true", help="Fix RTL punctuation issues for Hebrew (not for standard SRT)")
+    parser.add_argument("--profile", choices=["stable", "fast", "served"], help="Decoding profile (default: the model's own, else stable)")
+    parser.add_argument("--batch-size", type=int, default=8, help="Batch size for the served profile")
     parser.add_argument("--keep-wav", action="store_true", help="Don't delete temporary output.wav after transcription")
     parser.add_argument("--rtf", type=float, default=40.0, help="Expected processing speed (x real-time), only for the time estimate")
     parser.add_argument("--lang", choices=["en", "he", "ru", "auto"], default="he", help="Model language: en, he, ru, auto")

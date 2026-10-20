@@ -1,10 +1,12 @@
 import copy
+import json
 import os
 from typing import Callable, Optional
 
-from faster_whisper import WhisperModel
+from faster_whisper import BatchedInferencePipeline, WhisperModel
 
-from .subtitles import ADVANCED_SRT_AVAILABLE, render
+from .audio import load_pcm
+from .words import build_document
 
 PROFILES = {
     "fast": dict(
@@ -20,8 +22,20 @@ PROFILES = {
         no_speech_threshold=0.7,
         logprob_threshold=-1.0,
         compression_ratio_threshold=2.4
-    )
+    ),
+    # whisper_trainer's served decode (model card of orendar/whisper-large-v3-turbo-hebrew-kabbalah-ct2):
+    # greedy, no previous-text prompt, VAD windows decoded in batches
+    "served": dict(
+        batched=True,
+        vad_filter=True,
+        vad_parameters={"min_silence_duration_ms": 500},
+        beam_size=1,
+        condition_on_previous_text=False,
+    ),
 }
+
+# Optional file in a model directory: {"profile": "served", "boundary_correction_s": {"start", "end"}, "name": ...}
+MODEL_META = "ai_trns_model.json"
 
 
 class Cancelled(Exception):
@@ -39,19 +53,31 @@ class Transcriber:
     def __init__(self, lang: str, models_dir: str = "./models",
                  device: str = "cuda", compute_type: str = "float16"):
         self.lang = lang
-        self.model = WhisperModel(
-            model_path_for(lang, models_dir),
-            device=device,
-            compute_type=compute_type
-        )
+        path = model_path_for(lang, models_dir)
+        meta_path = os.path.join(path, MODEL_META)
+        self.meta = {}
+        if os.path.exists(meta_path):
+            with open(meta_path, encoding="utf-8") as f:
+                self.meta = json.load(f)
+        self.name = self.meta.get("name", os.path.basename(os.path.realpath(path)))
+        self.default_profile = self.meta.get("profile", "stable")
+        self.model = WhisperModel(path, device=device, compute_type=compute_type)
+        self.batched = BatchedInferencePipeline(self.model)
 
-    def segments(self, audio, profile: str = "stable", word_timestamps: bool = False,
-                 on_progress: Optional[Callable[[float], None]] = None,
-                 should_cancel: Optional[Callable[[], bool]] = None) -> list:
-        kwargs = copy.deepcopy(PROFILES[profile])
+    def transcribe(self, audio, profile: Optional[str] = None, batch_size: int = 8,
+                   on_progress: Optional[Callable[[float], None]] = None,
+                   should_cancel: Optional[Callable[[], bool]] = None) -> dict:
+        """Audio (path or 16 kHz array) -> words document (ai_trns.words)"""
+        if isinstance(audio, str):
+            audio = load_pcm(audio)
+        kwargs = copy.deepcopy(PROFILES[profile or self.default_profile])
+        batched = kwargs.pop("batched", False)
         kwargs["language"] = None if self.lang == "auto" else self.lang
-        kwargs["word_timestamps"] = word_timestamps
-        segments, info = self.model.transcribe(audio, **kwargs)
+        kwargs["word_timestamps"] = True
+        if batched:
+            segments, info = self.batched.transcribe(audio, batch_size=batch_size, **kwargs)
+        else:
+            segments, info = self.model.transcribe(audio, **kwargs)
         # segments is a lazy generator: progress and cancellation work between segments
         result = []
         for segment in segments:
@@ -60,13 +86,5 @@ class Transcriber:
             result.append(segment)
             if on_progress and info.duration:
                 on_progress(min(1.0, segment.end / info.duration))
-        return result
-
-    def transcribe(self, audio, formats=("srt",), profile: str = "stable",
-                   impl: int = 2, fix_rtl: bool = False,
-                   on_progress: Optional[Callable[[float], None]] = None,
-                   should_cancel: Optional[Callable[[], bool]] = None) -> dict:
-        """One Whisper pass for all requested formats -> {format: content}"""
-        words = "srt" in formats and impl == 2 and ADVANCED_SRT_AVAILABLE
-        segments = self.segments(audio, profile, words, on_progress, should_cancel)
-        return {fmt: render(segments, fmt, self.lang, impl, fix_rtl) for fmt in formats}
+        return build_document(result, info.duration, info.language, self.name,
+                              self.meta.get("boundary_correction_s"))

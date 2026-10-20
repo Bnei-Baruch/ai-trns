@@ -1,9 +1,17 @@
-"""Rendering Whisper segments to text / SRT"""
+"""Rendering a words document (ai_trns.words) to text / SRT / JSON"""
+import json
 import os
 import re
 from datetime import timedelta
 from tempfile import NamedTemporaryFile
+from types import SimpleNamespace
 from typing import Optional
+
+from . import cues
+
+FORMATS = ("txt", "srt", "json")
+# house: whisper_trainer cue policy (ai_trns.cues); advanced: ToSubs; standard: split segments by duration
+SRT_STYLES = ("house", "advanced", "standard")
 
 # Adding new imports for advanced SRT generation
 try:
@@ -15,20 +23,43 @@ except ImportError:
     print("[!] To use advanced SRT generation, install: pip install pysrt")
 
 
-def segments_to_text(segments) -> str:
-    return " ".join([s.text.strip() for s in segments])
-
-
-def render(segments, fmt: str, lang: str, impl: int = 2, fix_rtl: bool = False) -> str:
-    """fmt: txt | srt; impl: 1 = standard SRT, 2 = advanced SRT (needs word timestamps)"""
+def render(doc: dict, fmt: str, srt_style: str = "house", fix_rtl: bool = False) -> str:
+    """Words document -> txt | srt | json. CPU only, so any format can be rendered again later"""
     if fmt == "txt":
-        return segments_to_text(segments)
-    if impl == 2 and ADVANCED_SRT_AVAILABLE:
+        return doc["text"]
+    if fmt == "json":
+        return json.dumps(doc, ensure_ascii=False)
+    if fmt != "srt":
+        raise ValueError(f"unknown format {fmt!r}")
+    if srt_style == "house":
+        content = cues.render_srt(doc)
+        return fix_rtl_srt(content) if fix_rtl else content
+    segments = _segments_of(doc)
+    lang = doc.get("language") or "auto"
+    if srt_style == "advanced" and ADVANCED_SRT_AVAILABLE:
         content = segments_to_advanced_srt(segments, lang, fix_rtl)
         if content is not None:
             return content
         print("[!] Could not get word timestamps, using standard generation")
     return format_segments_to_srt(segments)
+
+
+def _segments_of(doc: dict) -> list:
+    """Segment objects in faster-whisper's shape, for the legacy renderers below"""
+    segments = [SimpleNamespace(start=s["start_s"], end=s["end_s"], text=s["text"], words=[])
+                for s in doc["segments"]]
+    for w in doc["words"]:
+        segments[w["segment"]].words.append(SimpleNamespace(start=w["start_s"], end=w["end_s"], word=w["word"]))
+    return segments
+
+
+def fix_rtl_srt(content: str) -> str:
+    """RTL marks on the text lines of an SRT (index and timing lines are kept)"""
+    out = []
+    for block in content.split("\n\n"):
+        lines = block.split("\n")
+        out.append("\n".join(lines[:2] + [fix_rtl_subtitle_line(line) for line in lines[2:]]))
+    return "\n\n".join(out)
 
 
 def split_segment_text_by_words(text, parts, min_words_per_chunk=2):

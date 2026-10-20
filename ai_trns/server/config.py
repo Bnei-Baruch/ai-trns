@@ -11,6 +11,8 @@ DB_PATH = os.environ.get("AI_TRNS_DB", os.path.join(JOBS_DIR, "jobs.sqlite"))
 
 DEVICE = os.environ.get("AI_TRNS_DEVICE", "cuda")
 COMPUTE_TYPE = os.environ.get("AI_TRNS_COMPUTE_TYPE", "float16")
+# Batch size of the served (batched) profile; 8 fits an 8 GB GPU with room to spare
+BATCH_SIZE = int(os.environ.get("AI_TRNS_BATCH_SIZE", "8"))
 # How many models to keep in (video) memory at once
 MAX_MODELS = int(os.environ.get("AI_TRNS_MAX_MODELS", "1"))
 PRELOAD_LANGS = _list("AI_TRNS_PRELOAD_LANGS")

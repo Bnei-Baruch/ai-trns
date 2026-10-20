@@ -5,6 +5,7 @@ import time
 from collections import OrderedDict
 
 from .. import audio
+from ..subtitles import render
 from . import config
 from .jobs import CANCELLED, DONE, ERROR, QUEUED, RUNNING, JobStore
 
@@ -116,15 +117,17 @@ class Worker:
             self.store.update(job_id, stage="transcribing")
             from ..transcriber import Cancelled
             try:
-                results = transcriber.transcribe(
-                    wav_file, formats=params["formats"], profile=params["profile"],
-                    impl=params["impl"], fix_rtl=params["fix_rtl"],
+                doc = transcriber.transcribe(
+                    wav_file, profile=params["profile"], batch_size=config.BATCH_SIZE,
                     on_progress=progress("transcribing", CONVERT_SHARE, 1 - CONVERT_SHARE),
                     should_cancel=should_cancel)
             except Cancelled:
                 raise _Cancelled()
 
-            for fmt, content in results.items():
+            # words.json is the job's real result; the formats asked for are rendered from it now
+            # and any other format / SRT style can be rendered from it later without the GPU
+            for fmt in ["json", *params["formats"]]:
+                content = render(doc, fmt, params["srt_style"], params["fix_rtl"])
                 with open(os.path.join(job_dir, f"result.{fmt}"), "w", encoding="utf-8") as f:
                     f.write(content)
             self.store.update(job_id, status=DONE, stage=None, progress=1.0, finished=time.time())

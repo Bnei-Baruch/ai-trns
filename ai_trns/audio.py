@@ -36,6 +36,18 @@ def get_duration(source: str) -> float:
         return 0.0
 
 
+def load_pcm(path: str):
+    """16 kHz mono float32 array via ffmpeg, so faster-whisper never needs PyAV
+    (faster-whisper 1.2.1 breaks on PyAV >= 15, which is all that installs on some hosts)"""
+    import numpy as np
+    cmd = ["ffmpeg", "-nostdin", *_protocols(path), "-v", "error", "-i", path,
+           "-ac", "1", "-ar", "16000", "-f", "f32le", "-"]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    if result.returncode != 0:
+        raise RuntimeError("ffmpeg failed: " + result.stderr.decode(errors="replace").strip()[-300:])
+    return np.frombuffer(result.stdout, np.float32)
+
+
 def convert_to_wav(source: str, wav_file: str, duration: float,
                    on_progress: Optional[Callable[[float], None]] = None,
                    should_cancel: Optional[Callable[[], bool]] = None) -> bool:
