@@ -1,111 +1,128 @@
-# Audio Transcription with Whisper
+# ai-trns
 
-faster-whisper + ffmpeg: transcription to text and SRT subtitles (with advanced splitting and RTL fixes for Hebrew).
+Speech-to-text service: Hebrew (and other languages) audio → words with timecodes → SRT / txt.
 
-Two ways to run, on the same core (`ai_trns/`):
+```
+clients ──HTTP──▶ API server (no GPU)                 GPU worker (one per GPU)
+                   jobs (SQLite), keys, TTL   ◀─pull─  lease a job, get the audio,
+                   words → srt/txt (CPU)               transcribe → words.json
+```
 
-- **CLI** (`whisper_fullfile_cli.py`) — one file per run, launched by [exec-api](https://github.com/Bnei-Baruch/exec-api). The current production setup.
-- **REST server** (`python -m ai_trns.server`) — the model stays in memory, jobs go through a queue.
+- **API server** (`python -m ai_trns.api`) takes jobs, keeps results, renders formats. It never touches a GPU.
+- **GPU worker** (`python -m ai_trns.worker`) holds the model, asks the API for work when idle and sends back a
+  words document. Workers pull, so a worker needs only outbound HTTP to the API; more GPUs = more workers.
+  A worker that goes silent loses its lease and the job goes back to the queue.
+- **Words document** (`ai_trns/words.py`) is the boundary between them: transcript, segments, words with the
+  engine's timecodes, audio duration and the model's calibrated boundary correction. SRT and txt are rendered
+  from it on the API side, so a format can be rendered again later without the GPU.
+- **SRT layout** (`ai_trns/cues.py`) is ported 1:1 from whisper_trainer (`timing_alignment.py` @29645c8): cues
+  of ≤ 84 chars on two balanced lines of ≤ 32, ≤ 7 s, split at pauses > 2 s, sentence punctuation and the longest
+  pause. `fix_rtl` adds RTL marks to Hebrew on top of it.
 
 ```
 ai_trns/
-  transcriber.py   Transcriber: model + profiles, one Whisper pass for all formats, progress/cancel
-  subtitles.py     text / SRT rendering (standard, advanced ToSubs, RTL fixes)
-  audio.py         ffprobe / ffmpeg → 16 kHz mono wav (with -protocol_whitelist)
-  server/          FastAPI app, SQLite job store, GPU worker
-whisper_fullfile_cli.py
+  protocol.py      API ↔ worker protocol (stdlib only)
+  words.py         words document (from faster-whisper segments)
+  cues.py          words → cues → SRT (whisper_trainer cue policy)
+  subtitles.py     words → txt / srt / json, RTL marks
+  audio.py         ffprobe / ffmpeg (-protocol_whitelist)
+  transcriber.py   faster-whisper model + decoding profiles → words document
+  api/             FastAPI app, job store with leases
+  worker/          worker loop, stdlib HTTP client
+whisper_fullfile_cli.py   one-file CLI for exec-api (legacy, until clients move to the API)
 ```
 
-Models in CTranslate2 format: `models/<lang>/` (`en`, `he`, `ru`; `auto` uses `models/en`, so it must be multilingual).
+## Models
 
-## Installation
-
-```bash
-pip install -r requirements.txt          # CLI
-pip install -r requirements-server.txt   # REST server
-```
-
-## CLI (exec-api)
-
-```bash
-python whisper_fullfile_cli.py --input audio.mp3 --srt --lang he --fix-rtl
-python whisper_fullfile_cli.py --input https://host/file.mp4 --srt --txt --lang ru
-```
-
-| Option | Default | |
-|---|---|---|
-| `--input` | — | file path or URL |
-| `--txt`, `--srt` | — | output formats; both together use one Whisper pass |
-| `--lang` | `he` | `en`, `he`, `ru`, `auto` |
-| `--impl` | `2` | SRT: `1` standard (split by duration), `2` advanced (pauses + punctuation) |
-| `--fix-rtl` | off | RTL markers for Hebrew (with `--impl 2`) |
-| `--profile` | `stable` | `stable` or `fast` |
-| `--out-dir` | `.` | where `output.txt` / `output.srt` / `output.wav` go |
-| `--report-file` | `report_python.log` | progress file; for exec-api it must be `report_<service ID>.log` |
-| `--models-dir` | `./models` | |
-| `--nginx-dir` | `/usr/share/nginx/html/ai/` | copy results there; `""` to disable |
-| `--keep-wav` | off | keep `output.wav` |
-| `--rtf` | `40` | only for the "expected time" estimate |
-
-The report file holds the last status line: `[FFmpeg] [###…] NN%`, `[Whisper] [###…] NN% - N sec`
-(ai-tools reads the `NN%`), then `[✓] DONE` or `[✗] ERROR: …`. Exit code: 0 ok, 1 error, 143 stopped (SIGTERM).
-
-exec-api service entry (arguments come only from `Args` in the config, `start` takes none):
+`models/<lang>/` in CTranslate2 format; `auto` uses `models/en` (must be multilingual). Hebrew is
+[`orendar/whisper-large-v3-turbo-hebrew-kabbalah-ct2`](https://huggingface.co/orendar/whisper-large-v3-turbo-hebrew-kabbalah-ct2).
+An optional `ai_trns_model.json` next to the model sets its decoding profile and timecode correction:
 
 ```json
-{"ID": "python", "Name": "python3",
- "Args": ["whisper_fullfile_cli.py", "--input", "/path/to/file.mp3", "--srt", "--lang", "he", "--fix-rtl"]}
+{"name": "whisper-large-v3-turbo-hebrew-kabbalah-ct2", "profile": "served",
+ "boundary_correction_s": {"start": -0.10020327299935161, "end": 0.21972081900943863}}
 ```
 
-## REST server
+Profiles: `served` (batched VAD windows, greedy, the model card's settings), `stable` (beam 8, no VAD),
+`fast` (beam 3, VAD). Without the file a model uses `stable` and no correction.
 
-```bash
-AI_TRNS_API_KEY=... AI_TRNS_HOST=0.0.0.0 python -m ai_trns.server
-```
+Measured with the Hebrew model, fp16, batch 8: RTX 3070 ~125× real time (105 min in ~50 s, peak 3.4 GB VRAM),
+RTX 2080 ~95×.
 
-One process, one worker thread: jobs run one after another on the GPU. Job state is in SQLite;
-after a restart queued jobs continue, a job that was running is marked `error`.
+## API
+
+Client key: `X-API-Key: <key>` or `Authorization: Bearer <key>`.
 
 | Method | Path | |
 |---|---|---|
-| `POST` | `/jobs` | multipart: `file` **or** `url`, `lang`, `format` (`srt`, `txt` or `srt,txt`), `impl`, `profile`, `fix_rtl` → `202` + job |
-| `GET` | `/jobs/{id}` | `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage`, `progress` 0..1, `queue_position`, `error` |
-| `GET` | `/jobs/{id}/result?format=srt` | result file (default: first format of the job) |
-| `DELETE` | `/jobs/{id}` | cancel (queued at once, running between segments) |
-| `GET` | `/health` | worker state, queue length, loaded models (no auth) |
-
-Auth: `X-API-Key: <key>` or `Authorization: Bearer <key>`.
+| `POST` | `/jobs` | multipart: `file` **or** `url`, `lang` (`he`, `en`, `ru`, `auto`), `format` (comma-separated `srt`, `txt`, `json`), `profile`, `fix_rtl` → `202` + job |
+| `GET` | `/jobs/{id}` | `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage`, `progress` 0..1, `queue_position`, `worker`, `attempts`, `error` |
+| `GET` | `/jobs/{id}/result?format=srt&fix_rtl=` | result; any format, also one not asked for, is rendered from the job's words |
+| `DELETE` | `/jobs/{id}` | cancel (a running job stops at the worker's next heartbeat) |
+| `POST` | `/render?format=srt&fix_rtl=` | words document (JSON body) → SRT / txt, no job, no GPU |
+| `GET` | `/health` | queue length, workers seen in the last 5 min and their jobs (no auth) |
 
 ```bash
-curl -H "X-API-Key: $KEY" -F file=@lecture.mp3 -F lang=he -F format=srt,txt -F fix_rtl=true http://localhost:8000/jobs
-curl -H "X-API-Key: $KEY" http://localhost:8000/jobs/<id>
-curl -H "X-API-Key: $KEY" -o lecture.srt "http://localhost:8000/jobs/<id>/result?format=srt"
+curl -H "X-API-Key: $KEY" -F file=@lecture.mp3 -F lang=he -F format=srt,txt http://host:8766/jobs
+curl -H "X-API-Key: $KEY" http://host:8766/jobs/<id>
+curl -H "X-API-Key: $KEY" -o lecture.srt "http://host:8766/jobs/<id>/result?format=srt"
 ```
 
-Environment:
+Worker endpoints (`/worker/*`, worker key + protocol version headers) are described in `ai_trns/protocol.py`.
+
+## Configuration
+
+API (`ai-trns-api.env`):
 
 | Variable | Default | |
 |---|---|---|
 | `AI_TRNS_HOST` / `AI_TRNS_PORT` | `127.0.0.1` / `8000` | |
-| `AI_TRNS_API_KEY` | empty | empty = **no auth** (a warning is logged) |
-| `AI_TRNS_MODELS_DIR` | `./models` | |
+| `AI_TRNS_API_KEY` | empty | empty = **no client auth** (a warning is logged) |
+| `AI_TRNS_WORKER_KEY` | empty | required for workers to connect |
 | `AI_TRNS_JOBS_DIR` | `./jobs` | `jobs/<id>/` per job + `jobs.sqlite` |
-| `AI_TRNS_DB` | `$AI_TRNS_JOBS_DIR/jobs.sqlite` | |
-| `AI_TRNS_DEVICE` / `AI_TRNS_COMPUTE_TYPE` | `cuda` / `float16` | |
-| `AI_TRNS_MAX_MODELS` | `1` | models kept in memory, LRU |
-| `AI_TRNS_PRELOAD_LANGS` | empty | e.g. `he` — load at startup |
 | `AI_TRNS_ALLOWED_URL_HOSTS` | empty | hosts allowed for `url`; empty = URL input disabled |
 | `AI_TRNS_MAX_UPLOAD_MB` | `2048` | |
+| `AI_TRNS_MAX_ATTEMPTS` | `3` | times a job is given to workers before it fails |
 | `AI_TRNS_JOB_TTL_HOURS` | `72` | finished jobs and their files are deleted after this |
-| `AI_TRNS_CORS_ORIGINS` | empty | comma-separated; empty = no CORS headers |
+| `AI_TRNS_CORS_ORIGINS` | empty | comma-separated |
 
-## SRT implementations
+Worker (`ai-trns-worker.env`):
 
-- `--impl 1` / `impl=1` — split each Whisper segment by duration (≤10 s), words spread evenly.
-- `--impl 2` / `impl=2` — word timestamps + `ToSubs` (from mdb-ai): split by pauses, punctuation, line length (≤60 chars, two lines), dashes in Hebrew.
-- `fix_rtl` — RTL embedding and LRM/RLM marks around punctuation, numbers and Latin words (Hebrew only).
+| Variable | Default | |
+|---|---|---|
+| `AI_TRNS_API_URL` | `http://127.0.0.1:8766` | |
+| `AI_TRNS_WORKER_KEY` | — | same as the API's |
+| `AI_TRNS_MODELS_DIR` | `./models` | |
+| `AI_TRNS_WORKER_LANGS` | models present | languages this worker takes |
+| `AI_TRNS_DEVICE` / `AI_TRNS_COMPUTE_TYPE` | `cuda` / `float16` | |
+| `AI_TRNS_BATCH_SIZE` | `8` | batch of the `served` profile |
+| `AI_TRNS_IDLE_UNLOAD_S` | `300` | the GPU is shared: models are unloaded after this idle time |
+| `AI_TRNS_WORK_DIR` | `./work` | temporary audio of the running job |
+| `AI_TRNS_WORKER_ID` | `<host>-<pid>` | |
 
-## Quality profiles
+## Install
 
-- `stable` (default) — `beam_size=8`, no VAD, temperature fallback
-- `fast` — `beam_size=3`, VAD filter
+```bash
+python3 -m venv /home/ai-trns/env
+/home/ai-trns/env/bin/pip install -r requirements-api.txt      # API host
+/home/ai-trns/env/bin/pip install -r requirements-worker.txt   # GPU host
+# ctranslate2 needs CUDA 12 cuBLAS/cuDNN; if the host has another toolkit:
+/home/ai-trns/env/bin/pip install nvidia-cublas-cu12 "nvidia-cudnn-cu12==9.*"
+```
+
+systemd units, run scripts and env examples are in `scripts/` (`ai-trns-api.service`, `ai-trns-worker.service`,
+run as user `ai-trns` from `/home/ai-trns`). `run_worker.sh` puts the pip CUDA libraries on `LD_LIBRARY_PATH`.
+faster-whisper 1.2.1 breaks with PyAV ≥ 15; audio is always decoded with ffmpeg, so PyAV is never used.
+
+Tests: `pytest tests` (needs ffmpeg; the worker tests run a real API server and a fake model).
+
+## CLI (exec-api, legacy)
+
+```bash
+python whisper_fullfile_cli.py --input audio.mp3 --srt --txt --lang he --fix-rtl
+```
+
+Writes `output.srt` / `output.txt` / `output.json` (`--json`) and progress to `report_python.log` (ai-tools reads
+`NN%` from it), then `[✓] DONE` or `[✗] ERROR: …`. Options: `--profile`, `--batch-size`, `--out-dir`,
+`--report-file`, `--models-dir`, `--nginx-dir` (`""` disables the copy), `--keep-wav`. `--impl` is accepted and
+ignored (the old SRT implementations were removed).

@@ -1,0 +1,15 @@
+[Unit]
+Description=ai-trns API server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ai-trns
+WorkingDirectory=/home/ai-trns
+EnvironmentFile=/home/ai-trns/ai-trns-api.env
+ExecStart=/home/ai-trns/app/scripts/run_api.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

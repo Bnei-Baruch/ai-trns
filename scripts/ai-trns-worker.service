@@ -1,0 +1,17 @@
+[Unit]
+Description=ai-trns GPU worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ai-trns
+WorkingDirectory=/home/ai-trns
+EnvironmentFile=/home/ai-trns/ai-trns-worker.env
+ExecStart=/home/ai-trns/app/scripts/run_worker.sh
+Restart=on-failure
+RestartSec=10
+# SIGTERM lets the running job finish; after this the job's lease expires and another worker retries it
+TimeoutStopSec=600
+
+[Install]
+WantedBy=multi-user.target

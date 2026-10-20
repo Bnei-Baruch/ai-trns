@@ -40,16 +40,14 @@ def test_document_text_is_exactly_the_words():
     assert doc["timing"]["boundary_correction_s"] == {"start": -0.1, "end": 0.2}
 
 
-@pytest.mark.parametrize("style", [
-    "house",
-    pytest.param("advanced", marks=pytest.mark.xfail(reason="ToSubs drops the last word (pre-existing bug)", strict=True)),
-    "standard",
-])
-def test_every_srt_style_renders_from_the_document(style):
+def test_every_format_renders_from_the_document():
+    # a pause over gap_split_s (2 s) starts a new cue
     doc = build_document([seg(0, 1, " שלום עולם.", [(" שלום", 0, 0.4), (" עולם.", 0.5, 0.9)]),
-                          seg(2, 3, " מה נשמע", [(" מה", 2.0, 2.3), (" נשמע", 2.4, 2.9)])],
-                         duration_s=3.0, language="he", model="m")
-    srt = render(doc, "srt", style)
-    assert "-->" in srt and "שלום" in srt and "נשמע" in srt
+                          seg(3, 4, " מה נשמע", [(" מה", 3.0, 3.3), (" נשמע", 3.4, 3.9)])],
+                         duration_s=4.0, language="he", model="m")
+    srt = render(doc, "srt")
+    assert srt == "1\n00:00:00,000 --> 00:00:00,900\nשלום עולם.\n\n2\n00:00:03,000 --> 00:00:03,900\nמה נשמע\n"
+    assert "\u202b" in render(doc, "srt", fix_rtl=True)
+    assert "\u202b" not in render({**doc, "language": "ru"}, "srt", fix_rtl=True)
     assert render(doc, "txt") == "שלום עולם. מה נשמע"
     assert json.loads(render(doc, "json")) == doc

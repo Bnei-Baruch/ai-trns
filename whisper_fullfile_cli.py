@@ -51,7 +51,6 @@ def run(args):
     formats = [fmt for fmt in ("txt", "srt", "json") if getattr(args, fmt)]
     if not formats:
         raise RuntimeError("nothing to do: pass --txt, --srt and/or --json")
-    srt_style = args.srt_style or ("standard" if args.impl == 1 else "advanced")
 
     # Load the required model by language
     transcriber = Transcriber(args.lang, args.models_dir)
@@ -72,11 +71,8 @@ def run(args):
 
         expected_sec = 4.5 * (duration / args.rtf)
         report(f"[~] Expected transcription time: {fmt_time(expected_sec)}")
-        if "srt" in formats:
-            impl_name = srt_style
-            if srt_style != "standard" and args.fix_rtl and args.lang in ("he", "auto"):
-                impl_name += " with RTL fixes"
-            report(f"[i] Using {impl_name} SRT implementation")
+        if "srt" in formats and args.fix_rtl and args.lang in ("he", "auto"):
+            report("[i] SRT with RTL fixes for Hebrew")
         report("[~] Transcribing... (this may take several minutes)")
 
         start = time.time()
@@ -98,7 +94,7 @@ def run(args):
     for fmt in formats:
         out_file = os.path.join(args.out_dir, f"output.{fmt}")
         with open(out_file, "w", encoding="utf-8") as f:
-            f.write(render(doc, fmt, srt_style, args.fix_rtl))
+            f.write(render(doc, fmt, args.fix_rtl))
         report(f"[✓] Saved to {out_file} (actual time: {fmt_time(actual_time)})")
         copy_to_nginx(out_file, args.nginx_dir)
 
@@ -110,9 +106,9 @@ def main():
     parser.add_argument("--txt", action="store_true", help="Save result to output.txt")
     parser.add_argument("--srt", action="store_true", help="Save result to output.srt")
     parser.add_argument("--json", action="store_true", help="Save words with timecodes to output.json")
-    parser.add_argument("--impl", type=int, choices=[1, 2], default=2, help="SRT implementation: 1=standard, 2=advanced with pause and punctuation analysis")
-    parser.add_argument("--srt-style", choices=["house", "advanced", "standard"], help="SRT layout; overrides --impl (house = whisper_trainer cue policy)")
-    parser.add_argument("--fix-rtl", action="store_true", help="Fix RTL punctuation issues for Hebrew (not for standard SRT)")
+    # Old SRT implementations were removed; still accepted so existing exec-api configs keep working
+    parser.add_argument("--impl", type=int, choices=[1, 2], help=argparse.SUPPRESS)
+    parser.add_argument("--fix-rtl", action="store_true", help="Add RTL marks to Hebrew subtitles")
     parser.add_argument("--profile", choices=["stable", "fast", "served"], help="Decoding profile (default: the model's own, else stable)")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size for the served profile")
     parser.add_argument("--keep-wav", action="store_true", help="Don't delete temporary output.wav after transcription")

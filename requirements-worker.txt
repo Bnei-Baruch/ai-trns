@@ -1,0 +1,5 @@
+# GPU worker (and the exec-api CLI); its HTTP client is stdlib only
+faster-whisper>=1.0.0
+numpy>=1.24.0
+# ctranslate2 wheels need CUDA 12 cuBLAS/cuDNN; on hosts without them system-wide:
+#   pip install nvidia-cublas-cu12 "nvidia-cudnn-cu12==9.*"  (run_worker.sh puts them on LD_LIBRARY_PATH)
