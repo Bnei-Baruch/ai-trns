@@ -1,16 +1,15 @@
 """
 API server: jobs, clients, results. No GPU here: GPU workers (ai_trns.worker) pull jobs
-through /worker/* (see ai_trns.protocol) and send back a words document, which is
-rendered to the formats a client asked for.
+through /worker/* (see ai_trns.protocol) and send back a words document (or a diarization
+document), which is rendered to the formats a client asked for (ai_trns.api.results).
 """
 import json
 import logging
 import os
+import re
 import secrets
-import shutil
 import threading
 import time
-import uuid
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
 
@@ -18,18 +17,18 @@ from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Query, Re
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 
-from .. import audio, protocol
-from ..subtitles import FORMATS, render
-from . import config, review
+from .. import protocol
+from ..subtitles import render
+from . import config, diarize, results, review, tadiff
 from .auth import Principal, can_see, principal
-from .jobs import CANCELLED, DONE, ERROR, QUEUED, RUNNING, JobStore
+from .jobs import CANCELLED, DONE, ERROR, QUEUED, RUNNING, TRANSCRIBE, JobStore, kind_of
+from .submit import UPLOAD, create_job as submit_job, job_view as view_of
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("ai-trns")
 
-MEDIA_TYPES = {"txt": "text/plain; charset=utf-8", "srt": "application/x-subrip; charset=utf-8",
-               "json": "application/json"}
-UPLOAD = "upload"
+# Job inputs a worker may download (GET /worker/jobs/{id}/files/{name})
+WORKER_FILE_RE = re.compile(r"^(cues\.json|sample\d+\.[a-z0-9]{1,5})$")
 # Workers not heard from for this long are dropped from /health
 WORKER_SEEN_S = 300
 
@@ -70,9 +69,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ai-trns", lifespan=lifespan)
 if config.CORS_ORIGINS:
+    # exposed: the result's file name and the X-<Kind>-* counters of tadiff / docdiff / diarize results
     app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS,
-                       allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["*"])
+                       allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["*"],
+                       expose_headers=["Content-Disposition", *results.STATS_HEADERS])
 app.include_router(review.router)
+app.include_router(tadiff.tadiff)
+app.include_router(tadiff.docdiff)
+app.include_router(diarize.router)
 
 
 def require_worker(request: Request):
@@ -85,10 +89,7 @@ def require_worker(request: Request):
 
 
 def job_view(job: dict) -> dict:
-    view = {k: job[k] for k in ("id", "status", "stage", "progress", "params", "error", "owner",
-                                "worker", "attempts", "created", "started", "finished")}
-    view["queue_position"] = app.state.store.queue_position(job["id"])
-    return view
+    return view_of(app.state.store, job)
 
 
 def get_job(job_id: str, who: Principal) -> dict:
@@ -105,17 +106,6 @@ def drop_upload(job_id: str):
         os.remove(os.path.join(app.state.store.job_dir(job_id), UPLOAD))
     except FileNotFoundError:
         pass
-
-
-def save_upload(file: UploadFile, dest: str):
-    limit = config.MAX_UPLOAD_MB * 1024 * 1024
-    size = 0
-    with open(dest, "wb") as out:
-        while chunk := file.file.read(1024 * 1024):
-            size += len(chunk)
-            if size > limit:
-                raise HTTPException(413, f"file is larger than {config.MAX_UPLOAD_MB} MB")
-            out.write(chunk)
 
 
 @app.get("/health")
@@ -141,35 +131,10 @@ def create_job(
     profile: Optional[Literal["stable", "fast", "served"]] = Form(None, description="default: the model's own"),
     fix_rtl: bool = Form(False),
 ):
-    if (file is None) == (not url):
-        raise HTTPException(422, "pass exactly one of `file` or `url`")
-    formats = sorted({f.strip() for f in format.split(",") if f.strip()})
-    if not formats or any(f not in FORMATS for f in formats):
-        raise HTTPException(422, f"format must be a comma-separated subset of {', '.join(FORMATS)}")
-    store = app.state.store
-    job_id = uuid.uuid4().hex
-    job_dir = store.job_dir(job_id)
-    os.makedirs(job_dir, exist_ok=True)
-    try:
-        if url:
-            if not config.ALLOWED_URL_HOSTS:
-                raise HTTPException(422, "URL input is disabled (AI_TRNS_ALLOWED_URL_HOSTS is empty)")
-            try:
-                audio.check_url(url, config.ALLOWED_URL_HOSTS)
-            except ValueError as e:
-                raise HTTPException(422, str(e))
-            source = url
-        else:
-            save_upload(file, os.path.join(job_dir, UPLOAD))
-            source = UPLOAD
-    except Exception:
-        shutil.rmtree(job_dir, ignore_errors=True)
-        raise
-
-    params = {"lang": lang, "formats": formats, "profile": profile, "fix_rtl": fix_rtl}
-    store.create(params, source, job_id, owner=who.owner)
-    log.info("job %s created by %s", job_id, who.name)
-    return job_view(store.get(job_id))
+    params = {"lang": lang, "formats": results.parse_formats(format, "transcribe"), "profile": profile,
+              "fix_rtl": fix_rtl}
+    job_id = submit_job(app.state.store, who, params, file, url)
+    return job_view(app.state.store.get(job_id))
 
 
 @app.get("/jobs")
@@ -184,23 +149,28 @@ def job_status(job_id: str, who: Principal = Depends(principal)):
 
 
 @app.get("/jobs/{job_id}/result")
-def job_result(job_id: str, format: Optional[Literal["txt", "srt", "json"]] = None,
+def job_result(job_id: str, format: Optional[str] = Query(None, description="default: the first one asked for; "
+                                                          "txt, srt, json, and diff / docx for tadiff / docdiff jobs"),
                fix_rtl: Optional[bool] = None, who: Principal = Depends(principal)):
-    """The result as rendered when the job finished, or rendered now from the job's words"""
+    """The result as rendered when the job finished, or rendered now from the worker's document.
+    The job's stats come as X-<Kind>-* headers too"""
     job = get_job(job_id, who)
     if job["status"] != DONE:
         raise HTTPException(409, f"job is {job['status']}")
     params = job["params"]
     fmt = format or params["formats"][0]
+    if fmt not in results.formats(params):
+        raise HTTPException(422, f"a {kind_of(params)} job has formats {', '.join(results.formats(params))}")
+    headers = {"Content-Disposition": results.content_disposition(results.download_name(job, fmt)),
+               **results.stats_headers(job)}
     job_dir = app.state.store.job_dir(job_id)
-    path = os.path.join(job_dir, f"result.{fmt}")
-    if os.path.exists(path) and (fix_rtl is None or fix_rtl == params["fix_rtl"]):
-        return FileResponse(path, media_type=MEDIA_TYPES[fmt], filename=f"{job_id}.{fmt}")
+    path = os.path.join(job_dir, results.file_name(fmt))
+    if os.path.exists(path) and (fix_rtl is None or fix_rtl == params.get("fix_rtl", False)):
+        return FileResponse(path, media_type=results.MEDIA_TYPES[fmt], headers=headers)
     with open(os.path.join(job_dir, "result.json"), encoding="utf-8") as f:
         doc = json.load(f)
-    content = render(doc, fmt, fix_rtl if fix_rtl is not None else params["fix_rtl"])
-    return Response(content, media_type=MEDIA_TYPES[fmt],
-                    headers={"Content-Disposition": f'attachment; filename="{job_id}.{fmt}"'})
+    content, _ = results.render(job_dir, params, doc, fmt, fix_rtl)
+    return Response(content, media_type=results.MEDIA_TYPES[fmt], headers=headers)
 
 
 @app.delete("/jobs/{job_id}")
@@ -223,7 +193,7 @@ def render_words(doc: dict = Body(..., description="words document, as GET /jobs
         content = render(doc, format, fix_rtl)
     except (KeyError, TypeError, ValueError, RuntimeError) as e:
         raise HTTPException(422, f"bad words document: {e}")
-    return Response(content, media_type=MEDIA_TYPES[format])
+    return Response(content, media_type=results.MEDIA_TYPES[format])
 
 
 # --- GPU workers (ai_trns.protocol) ---
@@ -242,8 +212,9 @@ def owned_job(job_id: str, worker: str) -> dict:
 @app.post("/worker/lease", dependencies=[Depends(require_worker)])
 def worker_lease(body: dict = Body(...)):
     worker, langs = str(body["worker"]), list(body["langs"])
-    seen(worker, langs=langs, job=None)
-    job = app.state.store.lease(worker, langs, protocol.LEASE_S)
+    engines = list(body.get("engines") or [TRANSCRIBE])
+    seen(worker, langs=langs, engines=engines, job=None)
+    job = app.state.store.lease(worker, langs, protocol.LEASE_S, engines)
     if job is None:
         return Response(status_code=204)
     seen(worker, job=job["id"])
@@ -258,6 +229,16 @@ def worker_audio(job_id: str, worker: str):
     path = os.path.join(app.state.store.job_dir(job_id), UPLOAD)
     if not os.path.exists(path):
         raise HTTPException(404, "job has no uploaded audio")
+    return FileResponse(path, media_type="application/octet-stream")
+
+
+@app.get("/worker/jobs/{job_id}/files/{name}", dependencies=[Depends(require_worker)])
+def worker_file(job_id: str, name: str, worker: str):
+    """Another input of the job: a diarize job's cues.json and voice samples"""
+    owned_job(job_id, worker)
+    path = os.path.join(app.state.store.job_dir(job_id), name)
+    if not WORKER_FILE_RE.match(name) or not os.path.exists(path):
+        raise HTTPException(404, "job has no such file")
     return FileResponse(path, media_type="application/octet-stream")
 
 
@@ -276,18 +257,21 @@ def worker_result(job_id: str, worker: str, doc: dict = Body(...)):
     seen(worker, job=None)
     store, params = app.state.store, job["params"]
     job_dir = store.job_dir(job_id)
+    stats = {}
     try:
         # result.json is the job's real result: other formats can be rendered from it later
         for fmt in ["json", *params["formats"]]:
-            content = render(doc, fmt, params["fix_rtl"])
-            with open(os.path.join(job_dir, f"result.{fmt}"), "w", encoding="utf-8") as f:
-                f.write(content)
+            content, fmt_stats = results.render(job_dir, params, doc, fmt)
+            stats.update(fmt_stats or {})
+            with open(os.path.join(job_dir, results.file_name(fmt)), "wb") as f:
+                f.write(content if isinstance(content, bytes) else content.encode("utf-8"))
     except (KeyError, TypeError, ValueError, RuntimeError) as e:
-        log.exception("job %s: bad words document from %s", job_id, worker)
-        store.update(job_id, status=ERROR, error=f"bad words document: {e}", finished=time.time())
+        log.exception("job %s: bad document from %s", job_id, worker)
+        store.update(job_id, status=ERROR, error=f"bad document: {e}", finished=time.time())
         drop_upload(job_id)
-        raise HTTPException(422, f"bad words document: {e}")
-    store.update(job_id, status=DONE, stage=None, progress=1.0, finished=time.time())
+        raise HTTPException(422, f"bad document: {e}")
+    store.update(job_id, status=DONE, stage=None, progress=1.0, finished=time.time(),
+                 stats=json.dumps(stats) if stats else None)
     drop_upload(job_id)
     log.info("job %s done by %s", job_id, worker)
     return {"ok": True}

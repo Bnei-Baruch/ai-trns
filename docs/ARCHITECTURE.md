@@ -1,6 +1,7 @@
 # Архитектура ai-trns
 
-ai-trns — сервис распознавания речи: аудио → слова с таймкодами → SRT / txt.
+ai-trns — сервис распознавания речи: аудио → слова с таймкодами → SRT / txt. Плюс инструменты поверх
+распознавания из stt-api: спикеры (`/diarize`), сравнение текста с аудио (`/tadiff`, `/docdiff`), проверка качества (`/review`).
 Состоит из API-сервера (без GPU) и GPU-воркеров. Документ описывает, как они связаны,
 где лежит код и где что развёрнуто.
 
@@ -41,6 +42,9 @@ ai-trns/
     words.py               контракт «документ со словами» — граница GPU/CPU
     cues.py                слова → реплики → SRT (алгоритм whisper_trainer, перенесён 1:1)
     subtitles.py           слова → txt / srt / json, RTL-маркеры для иврита
+    textdiff.py            текст ↔ услышанные слова: removed / added / changed (/tadiff, /docdiff)
+    diarize/               спикеры: engine.py — движок воркера (pyannote, MMS-CTC); srt, mapping,
+                           resegment, labels — без моделей
     audio.py               ffprobe / ffmpeg: длительность, конвертация, декодирование в массив
     transcriber.py         модель faster-whisper + профили декодирования → документ со словами
     api/                   API-сервер (FastAPI), без GPU
@@ -48,6 +52,10 @@ ai-trns/
       auth.py              авторизация: токены Keycloak, ключи сервисов, владельцы задач
       jobs.py              хранилище задач (SQLite): очередь, аренда, истечение, TTL
       review.py            проверка качества STT людьми (/review/*, перенесено из stt-api)
+      tadiff.py, diarize.py  /tadiff, /docdiff, /diarize (перенесено из stt-api): создают задачи
+      results.py           виды задач: форматы результата и их рендер, счётчики
+      submit.py            создание задачи из файла / URL и входов вида задачи
+      docx_marks.py        текст из .docx и подсветка слов (/docdiff)
       config.py            настройки из окружения (AI_TRNS_*)
     worker/                GPU-воркер
       __main__.py          цикл: аренда → аудио → распознавание → результат; кэш моделей
@@ -62,9 +70,10 @@ ai-trns/
 **Что импортирует что.**
 - API не импортирует faster-whisper.
 - Воркер не импортирует fastapi.
-- Общие только `protocol.py`, `words.py`, `audio.py`.
+- Общие `protocol.py`, `words.py`, `audio.py` и модели-независимые части `diarize/`.
 
-Поэтому у них разные зависимости: `requirements-api.txt` и `requirements-worker.txt`.
+Поэтому у них разные зависимости: `requirements-api.txt` и `requirements-worker.txt`. Движку diarize нужен ещё
+`requirements-diarize.txt` (torch, pyannote, torchaudio, uroman); он включается только там, где задан.
 
 **Почему один репозиторий.** Контракт (`words.py`, `protocol.py`) общий для обеих частей, и его версии не должны разъехаться. На все машины ставится один и тот же коммит. Если версии протокола у воркера и API не совпадают, API отвечает воркеру 409.
 
@@ -201,7 +210,40 @@ ai-trns/
 **stt-api** (`~/projects/stt-api`, хост `stt`, сервис `stt-api.service`):
 - `/stt/*` — прокси на Whisper-сервис whisper_trainer (через Angie `/whisper/`). Больше не нужен: страница תמלול в ai-tools ходит прямо в `/jobs` ai-trns;
 - `/review/*` — перенесено в ai-trns (`ai_trns/api/review.py`), см. ниже;
-- `/diarize`, `/tadiff`, `/docdiff` — свои модели на GPU (pyannote, MMS-CTC), в UI выключены. Пока остаются в stt-api.
+- `/diarize`, `/tadiff`, `/docdiff` — перенесено в ai-trns, см. ниже. В UI ai-tools выключены.
+
+### Виды задач: `/tadiff`, `/docdiff`, `/diarize`
+
+Пути и поля запросов те же, что в stt-api. Главное отличие: **ответ не сразу**. GPU на API нет, поэтому запрос
+создаёт задачу (202, как `POST /jobs`), результат — `GET /jobs/{id}/result`. Счётчики (бывшие заголовки
+`X-Docdiff-*`, `X-Diarize-*`) — в поле `stats` задачи и в тех же заголовках ответа с результатом.
+Аудио — файлом (`audio`) или ссылкой (`url`, те же разрешённые хосты, что у `/jobs`).
+
+| Вид (`params.kind`) | Движок воркера | Создаёт | Результат (первый — по умолчанию) |
+|---|---|---|---|
+| `transcribe` | transcribe | `POST /jobs` | txt, srt, json |
+| `tadiff` | transcribe | `POST /tadiff/compare` (аудио + `text`) | diff (JSON stt-api), txt, srt, json |
+| `docdiff` | transcribe | `POST /docdiff/compare` (`.docx` + аудио) | docx (`<имя>_marked.docx`), diff, txt, srt, json |
+| `diarize` | diarize | `POST /diarize/srt`, `/diarize/words` (аудио + SRT + образцы голоса) | srt (размеченный), json (слова со спикерами) |
+
+Сразу, без задачи и GPU: `POST /tadiff/compare-timestamps` (текст + слова с таймкодами) и `POST /diarize/words/srt`
+(слова со спикерами → новый SRT).
+
+- **tadiff / docdiff** — это обычное распознавание. Воркер не знает, что это сравнение. Когда приходят слова,
+  API сравнивает их с текстом (`textdiff.py`, логика stt-api без изменений). В stt-api для этого был отдельный
+  Whisper (transformers, `whisper-prev`) + CTC-выравнивание; здесь та же модель, что для субтитров, и её
+  собственные таймкоды слов. Поэтому диффы с stt-api могут отличаться там, где модели слышат по-разному.
+- **diarize** — свой движок воркера (`diarize/engine.py`, код stt-api): pyannote на весь файл, образцы голоса
+  (`AI_TRNS_SPEAKERS_DIR/<Имя>/*.mp3`, на воркере, плюс присланные с запросом), каждое слово каждой реплики
+  выравнивается MMS-CTC (запасной вариант — VAD из faster-whisper вместо torch.hub). Воркер возвращает документ
+  со словами и спикерами (формат `/diarize/words` stt-api), а размеченный SRT строит API. Реплики и образцы
+  воркер скачивает через `GET /worker/jobs/{id}/files/{name}`.
+  Проверено на `stt` (RTX 3070) на уроке 1:45 ч: 159 с, результат совпадает с stt-api слово в слово
+  (7790 слов, спикеры и таймкоды).
+- **Воркер с diarize:** `AI_TRNS_WORKER_ENGINES=transcribe,diarize`, `HF_TOKEN` (лицензия
+  `pyannote/speaker-diarization-community-1` принята), `pip install -r requirements-diarize.txt`. Без этого воркер
+  берёт только распознавание, задачи diarize ждут в очереди. Модели одна за раз: при смене вида задачи
+  предыдущая выгружается.
 
 ### Проверка качества STT (`/review/*`)
 
@@ -290,6 +332,8 @@ ai-tools → `/rest/` → exec-api на `ai-tools` → `whisper_fullfile_cli.py`
 | Поправка таймкодов в реплики, а не в слова | Сдвиг слов изменил бы паузы, по которым режутся реплики, и результат перестал бы совпадать с whisper_trainer |
 | Один алгоритм SRT (whisper_trainer) | Откалиброван по профессиональным субтитрам архива. Старые варианты были хуже и с багами (`ToSubs` терял последнее слово) |
 | Код whisper_trainer не копировать, а вызывать | Их декодер активно развивается, и их оценка качества должна видеть ровно прод-код. Копия разошлась бы |
+| tadiff / docdiff — распознавание + сравнение на API | Второй Whisper на GPU не нужен, сравнение дешёвое и повторяемое из слов |
+| diarize — отдельный движок, SRT на API | pyannote и MMS тяжёлые и нужны не на каждом GPU; документ со словами и спикерами позволяет перестроить SRT без GPU |
 | HTTP-клиент воркера только на stdlib | Воркер можно запустить внутри locked-окружения whisper_trainer, не добавляя туда пакеты |
 | Модель выгружается при простое | GPU 8 ГБ делят с exec-api, ollama, stt-api. Загрузка занимает около 1 с |
 | Одна задача на GPU | Две задачи на одном GPU не ускоряют работу: узкое место — CPU |

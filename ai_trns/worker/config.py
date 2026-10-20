@@ -11,6 +11,13 @@ WORKER_KEY = os.environ.get("AI_TRNS_WORKER_KEY", "")
 WORKER_ID = os.environ.get("AI_TRNS_WORKER_ID", f"{socket.gethostname()}-{os.getpid()}")
 
 MODELS_DIR = os.environ.get("AI_TRNS_MODELS_DIR", "./models")
+# Engines this worker runs: transcribe (faster-whisper), diarize (pyannote + MMS, requirements-diarize.txt)
+ENGINES = _list("AI_TRNS_WORKER_ENGINES") or ["transcribe"]
+# diarize: built-in voice samples, <dir>/<Name>/*.mp3 (or <dir>/<Name>.mp3); the pyannote pipeline and
+# a HuggingFace token with its license accepted
+SPEAKERS_DIR = os.environ.get("AI_TRNS_SPEAKERS_DIR") or os.path.join(MODELS_DIR, "speakers")
+DIARIZE_PIPELINE = os.environ.get("AI_TRNS_DIARIZE_PIPELINE", "pyannote/speaker-diarization-community-1")
+HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
 # Languages this worker takes jobs for; default: every models/<lang> present ("auto" needs models/en)
 LANGS = _list("AI_TRNS_WORKER_LANGS")
 DEVICE = os.environ.get("AI_TRNS_DEVICE", "cuda")

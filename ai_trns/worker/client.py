@@ -43,12 +43,17 @@ class Client:
     def _q(self) -> str:
         return f"?worker={quote(self.worker)}"
 
-    def lease(self, langs: list) -> Optional[dict]:
-        return self._json("POST", "/worker/lease", {"worker": self.worker, "langs": langs})
+    def lease(self, langs: list, engines: list) -> Optional[dict]:
+        return self._json("POST", "/worker/lease", {"worker": self.worker, "langs": langs, "engines": engines})
 
-    def download_audio(self, path: str, dest: str):
+    def download(self, path: str, dest: str):
+        """The job's uploaded audio (its source's "upload" path) or another input (file_path)"""
         with self._request("GET", path + self._q(), timeout=600) as response, open(dest, "wb") as out:
             shutil.copyfileobj(response, out, 1024 * 1024)
+
+    @staticmethod
+    def file_path(job_id: str, name: str) -> str:
+        return f"/worker/jobs/{job_id}/files/{quote(name)}"
 
     def heartbeat(self, job_id: str, stage: str, progress: float) -> bool:
         """True if the job was cancelled (or is no longer this worker's)"""

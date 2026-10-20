@@ -1,12 +1,16 @@
 """
-GPU worker: lease a job from the API, get its audio, transcribe it to a words document,
-send it back. One job at a time per worker (one worker per GPU). Run: python -m ai_trns.worker
+GPU worker: lease a job from the API, get its audio, run it through an engine, send back the
+document. Engines: transcribe (faster-whisper -> words document) and diarize (pyannote + MMS ->
+diarization document, ai_trns.diarize). One job at a time per worker (one worker per GPU).
+Run: python -m ai_trns.worker
 """
 import gc
+import json
 import logging
 import os
 import shutil
 import signal
+import sys
 import threading
 import time
 from typing import Optional
@@ -18,26 +22,36 @@ from .client import ApiError, Client
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("ai-trns.worker")
 
-# Share of the job's progress taken by audio conversion; the rest is Whisper
+# Share of the job's progress taken by audio conversion; the rest is the engine
 CONVERT_SHARE = 0.1
+DIARIZE = "diarize"
 
 
 class Models:
-    """Loaded Transcribers by language, unloaded after IDLE_UNLOAD_S so the GPU is free for others"""
+    """Loaded Transcribers by language and the Diarizer, unloaded after IDLE_UNLOAD_S so the GPU is
+    free for others"""
 
     def __init__(self):
         self.loaded = {}
         self.last_used = 0.0
 
-    def get(self, lang: str):
-        if lang not in self.loaded:
+    def _load(self, key: str, make):
+        if key not in self.loaded:
             # one model at a time on an 8 GB GPU
             self.unload()
-            log.info("loading model %s", lang)
-            from ..transcriber import Transcriber
-            self.loaded[lang] = Transcriber(lang, config.MODELS_DIR, config.DEVICE, config.COMPUTE_TYPE)
+            log.info("loading model %s", key)
+            self.loaded[key] = make()
         self.last_used = time.time()
-        return self.loaded[lang]
+        return self.loaded[key]
+
+    def get(self, lang: str):
+        from ..transcriber import Transcriber
+        return self._load(lang, lambda: Transcriber(lang, config.MODELS_DIR, config.DEVICE, config.COMPUTE_TYPE))
+
+    def diarizer(self):
+        from ..diarize.engine import Diarizer
+        return self._load(DIARIZE, lambda: Diarizer(config.SPEAKERS_DIR, config.DEVICE, config.DIARIZE_PIPELINE,
+                                                    config.HF_TOKEN))
 
     def unload_if_idle(self):
         if self.loaded and time.time() - self.last_used > config.IDLE_UNLOAD_S:
@@ -48,6 +62,9 @@ class Models:
             log.info("unloading models %s", ", ".join(self.loaded))
             self.loaded.clear()
             gc.collect()
+            if "torch" in sys.modules:
+                # give the memory back to the other services on the GPU, not only to torch's cache
+                sys.modules["torch"].cuda.empty_cache()
 
 
 def available_langs() -> list:
@@ -89,6 +106,28 @@ class Heartbeat:
             self.stopped.wait(protocol.HEARTBEAT_S)
 
 
+def diarize(client: Client, models: Models, job: dict, job_dir: str, wav_file: str, beat: "Heartbeat") -> dict:
+    """The diarize engine: the job's cues and voice samples come from the API next to its audio"""
+    job_id, params = job["id"], job["params"]
+    beat.update("downloading", CONVERT_SHARE)
+    cues_file = os.path.join(job_dir, "cues.json")
+    client.download(client.file_path(job_id, "cues.json"), cues_file)
+    with open(cues_file, encoding="utf-8") as f:
+        cues = json.load(f)
+    samples = []
+    for sample in params.get("samples", []):
+        path = os.path.join(job_dir, sample["file"])
+        client.download(client.file_path(job_id, sample["file"]), path)
+        samples.append((sample["name"], path))
+    beat.update("loading_model", CONVERT_SHARE)
+    diarizer = models.diarizer()
+    beat.update("diarizing", CONVERT_SHARE)
+    return diarizer.diarize(
+        wav_file, cues, samples, lang=params["lang"], speakers=params.get("speakers"),
+        on_progress=lambda p: beat.update("diarizing", CONVERT_SHARE + (1 - CONVERT_SHARE) * p),
+        should_cancel=beat.cancelled.is_set)
+
+
 def run_job(client: Client, models: Models, job: dict):
     job_id, params = job["id"], job["params"]
     job_dir = os.path.join(config.WORK_DIR, job_id)
@@ -98,7 +137,7 @@ def run_job(client: Client, models: Models, job: dict):
             if "upload" in job["source"]:
                 beat.update("downloading", 0.0)
                 source = os.path.join(job_dir, "upload")
-                client.download_audio(job["source"]["upload"], source)
+                client.download(job["source"]["upload"], source)
             else:
                 source = job["source"]["url"]
             duration = audio.get_duration(source)
@@ -110,15 +149,18 @@ def run_job(client: Client, models: Models, job: dict):
                                         beat.cancelled.is_set):
                 log.info("job %s cancelled", job_id)
                 return
-            beat.update("loading_model", CONVERT_SHARE)
-            transcriber = models.get(params["lang"])
-            beat.update("transcribing", CONVERT_SHARE)
             from ..transcriber import Cancelled
             try:
-                doc = transcriber.transcribe(
-                    wav_file, profile=params.get("profile"), batch_size=config.BATCH_SIZE,
-                    on_progress=lambda p: beat.update("transcribing", CONVERT_SHARE + (1 - CONVERT_SHARE) * p),
-                    should_cancel=beat.cancelled.is_set)
+                if params.get("kind") == DIARIZE:
+                    doc = diarize(client, models, job, job_dir, wav_file, beat)
+                else:
+                    beat.update("loading_model", CONVERT_SHARE)
+                    transcriber = models.get(params["lang"])
+                    beat.update("transcribing", CONVERT_SHARE)
+                    doc = transcriber.transcribe(
+                        wav_file, profile=params.get("profile"), batch_size=config.BATCH_SIZE,
+                        on_progress=lambda p: beat.update("transcribing", CONVERT_SHARE + (1 - CONVERT_SHARE) * p),
+                        should_cancel=beat.cancelled.is_set)
             except Cancelled:
                 log.info("job %s cancelled", job_id)
                 return
@@ -141,8 +183,9 @@ def run_job(client: Client, models: Models, job: dict):
 def main(stop: Optional[threading.Event] = None):
     if not config.WORKER_KEY:
         raise SystemExit("AI_TRNS_WORKER_KEY is not set")
-    langs = available_langs()
-    if not langs:
+    engines = config.ENGINES
+    langs = available_langs() if "transcribe" in engines else []
+    if "transcribe" in engines and not langs:
         raise SystemExit(f"no models in {config.MODELS_DIR}")
     stop = stop or threading.Event()
     if threading.current_thread() is threading.main_thread():
@@ -150,10 +193,11 @@ def main(stop: Optional[threading.Event] = None):
         signal.signal(signal.SIGTERM, lambda *_: stop.set())
     client = Client(config.API_URL, config.WORKER_KEY, config.WORKER_ID)
     models = Models()
-    log.info("worker %s: API %s, langs %s", config.WORKER_ID, config.API_URL, ",".join(langs))
+    log.info("worker %s: API %s, engines %s, langs %s", config.WORKER_ID, config.API_URL, ",".join(engines),
+             ",".join(langs))
     while not stop.is_set():
         try:
-            job = client.lease(langs)
+            job = client.lease(langs, engines)
         except Exception as e:
             log.warning("lease failed: %s", e)
             job = None
@@ -164,7 +208,9 @@ def main(stop: Optional[threading.Event] = None):
             models.unload_if_idle()
             stop.wait(config.POLL_S)
             continue
-        log.info("job %s: lang %s, formats %s", job["id"], job["params"]["lang"], job["params"]["formats"])
+        params = job["params"]
+        log.info("job %s: %s, lang %s, formats %s", job["id"], params.get("kind", "transcribe"), params["lang"],
+                 params["formats"])
         run_job(client, models, job)
 
 

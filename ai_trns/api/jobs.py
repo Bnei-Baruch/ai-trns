@@ -12,6 +12,18 @@ from . import config
 QUEUED, RUNNING, DONE, ERROR, CANCELLED = "queued", "running", "done", "error", "cancelled"
 FINAL = (DONE, ERROR, CANCELLED)
 
+# Worker engines; a job's engine follows from its kind (params["kind"], "transcribe" if absent)
+TRANSCRIBE, DIARIZE = "transcribe", "diarize"
+KIND_ENGINES = {"transcribe": TRANSCRIBE, "tadiff": TRANSCRIBE, "docdiff": TRANSCRIBE, "diarize": DIARIZE}
+
+
+def kind_of(params: dict) -> str:
+    return params.get("kind", "transcribe")
+
+
+def engine_of(params: dict) -> str:
+    return KIND_ENGINES[kind_of(params)]
+
 
 class JobStore:
     """Job state in SQLite; running jobs belong to a worker until its lease runs out"""
@@ -38,12 +50,13 @@ class JobStore:
                 attempts INTEGER NOT NULL DEFAULT 0,
                 created REAL NOT NULL,
                 started REAL,
-                finished REAL
+                finished REAL,
+                stats TEXT
             )""")
-        # Databases from before workers were separate lack the lease columns
+        # Older databases lack the lease columns (from before workers were separate) and stats
         columns = {r["name"] for r in self.db.execute("PRAGMA table_info(jobs)")}
         for name, ddl in (("owner", "TEXT"), ("worker", "TEXT"), ("lease_until", "REAL"),
-                          ("attempts", "INTEGER NOT NULL DEFAULT 0")):
+                          ("attempts", "INTEGER NOT NULL DEFAULT 0"), ("stats", "TEXT")):
             if name not in columns:
                 self.db.execute(f"ALTER TABLE jobs ADD COLUMN {name} {ddl}")
         self.db.commit()
@@ -68,6 +81,7 @@ class JobStore:
             return None
         job = dict(row)
         job["params"] = json.loads(job["params"])
+        job["stats"] = json.loads(job["stats"]) if job["stats"] else None
         return job
 
     def update(self, job_id: str, **fields):
@@ -94,14 +108,17 @@ class JobStore:
         ids = self.queued_ids()
         return ids.index(job_id) + 1 if job_id in ids else None
 
-    def lease(self, worker: str, langs: list, lease_s: float) -> Optional[dict]:
-        """Give the oldest queued job this worker can do to it"""
+    def lease(self, worker: str, langs: list, lease_s: float, engines=(TRANSCRIBE,)) -> Optional[dict]:
+        """Give the oldest queued job this worker can do to it: a transcription in one of its
+        languages, or a job for another of its engines"""
         now = time.time()
         with self.lock:
             rows = self.db.execute(
                 "SELECT id, params FROM jobs WHERE status = ? ORDER BY created", (QUEUED,)).fetchall()
             for row in rows:
-                if json.loads(row["params"])["lang"] in langs:
+                params = json.loads(row["params"])
+                engine = engine_of(params)
+                if engine in engines and (engine != TRANSCRIBE or params["lang"] in langs):
                     self.db.execute(
                         "UPDATE jobs SET status = ?, worker = ?, lease_until = ?, attempts = attempts + 1, "
                         "stage = NULL, progress = 0, started = ? WHERE id = ?",

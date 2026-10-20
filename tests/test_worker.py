@@ -104,3 +104,37 @@ def test_cancel_stops_the_worker_between_segments(server, worker, audio_file, mo
         job = http.get(f"/jobs/{job_id}", headers=H).json()
         assert job["status"] == "cancelled"
         assert http.get("/health").json()["workers"]["test-worker"]["job"] is None
+
+
+def test_worker_diarizes_with_the_job_cues_and_samples(server, worker, audio_file, monkeypatch):
+    import httpx
+    from ai_trns.worker import __main__ as w
+    from ai_trns.worker import config
+    from tests.test_tools import SRT, diarize_doc
+    monkeypatch.setattr(config, "ENGINES", ["transcribe", "diarize"])
+    calls = []
+
+    class FakeDiarizer:
+        def diarize(self, wav_file, cues, samples, lang, speakers, on_progress, should_cancel):
+            calls.append((len(cues), [(name, open(path, "rb").read()) for name, path in samples], lang, speakers))
+            on_progress(0.5)
+            return diarize_doc()
+
+    monkeypatch.setattr(w.Models, "diarizer", lambda self: FakeDiarizer())
+    # the loop already running leases with the engines it read at start: run a second one
+    stop = threading.Event()
+    monkeypatch.setattr(config, "WORKER_ID", "diarize-worker")
+    thread = threading.Thread(target=w.main, args=(stop,), daemon=True)
+    thread.start()
+    try:
+        with httpx.Client(base_url=server) as http, open(audio_file, "rb") as f:
+            job_id = http.post("/diarize/srt", headers=H, data={"sample_names": ["Guest"], "num_speakers": "2"},
+                               files=[("audio", ("in.mp3", f)), ("srt", ("a.srt", SRT.encode())),
+                                      ("samples", ("g.wav", b"voice"))]).json()["id"]
+            job = wait_status(http, job_id, ("done", "error"))
+            assert (job["status"], job["worker"]) == ("done", "diarize-worker"), job
+            assert calls == [(2, [("Guest", b"voice")], "he", {"num_speakers": 2})]
+            assert http.get(f"/jobs/{job_id}/result", headers=H).text.startswith("1\n00:00:00,000 --> 00:00:01,000\nרב: ")
+    finally:
+        stop.set()
+        thread.join(timeout=10)
