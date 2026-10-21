@@ -10,7 +10,7 @@ from fastapi import HTTPException, UploadFile
 from .. import audio
 from . import config
 from .auth import Principal
-from .jobs import JobStore
+from .jobs import TRANSCRIBE, JobStore, engine_of
 
 log = logging.getLogger("ai-trns")
 
@@ -34,6 +34,8 @@ def create_job(store: JobStore, who: Principal, params: dict, file: Optional[Upl
     uploads: {name: UploadFile} are saved in the job dir for the worker or the result renderer"""
     if (file is None) == (not url):
         raise HTTPException(422, "pass exactly one of an audio file or `url`")
+    if file is not None and engine_of(params) == TRANSCRIBE and not config.TRANSCRIBE_UPLOADS:
+        raise HTTPException(422, "audio files are not accepted for transcription, pass `url`")
     job_id = uuid.uuid4().hex
     job_dir = store.job_dir(job_id)
     os.makedirs(job_dir, exist_ok=True)

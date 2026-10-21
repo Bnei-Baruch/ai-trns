@@ -27,6 +27,7 @@ def api_config(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "OIDC_ISSUER", "")
     monkeypatch.setattr(config, "WORKER_KEY", WORKER_KEY)
     monkeypatch.setattr(config, "ALLOWED_URL_HOSTS", ["cdn.example.org"])
+    monkeypatch.setattr(config, "TRANSCRIBE_UPLOADS", True)
     return config
 
 

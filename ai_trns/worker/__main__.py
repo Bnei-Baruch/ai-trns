@@ -1,7 +1,8 @@
 """
 GPU worker: lease a job from the API, get its audio, run it through an engine, send back the
-document. Engines: transcribe (faster-whisper -> words document) and diarize (pyannote + MMS ->
-diarization document, ai_trns.diarize). One job at a time per worker (one worker per GPU).
+document. Engines: transcribe (faster-whisper -> words document, or whisper_trainer's service
+with AI_TRNS_STT_URL: ai_trns.stt_service) and diarize (pyannote + MMS -> diarization document,
+ai_trns.diarize). One job at a time per worker (one worker per GPU).
 Run: python -m ai_trns.worker
 """
 import gc
@@ -70,6 +71,8 @@ class Models:
 def available_langs() -> list:
     if config.LANGS:
         return config.LANGS
+    if config.STT_URL:
+        return ["he"]
     langs = [lang for lang in ("he", "en", "ru") if os.path.isdir(os.path.join(config.MODELS_DIR, lang))]
     return langs + (["auto"] if "en" in langs else [])
 
@@ -128,43 +131,69 @@ def diarize(client: Client, models: Models, job: dict, job_dir: str, wav_file: s
         should_cancel=beat.cancelled.is_set)
 
 
+def transcribe_by_service(job: dict, beat: "Heartbeat") -> Optional[dict]:
+    """The transcribe engine with AI_TRNS_STT_URL: the service fetches the media itself"""
+    from .. import stt_service
+    if "url" not in job["source"]:
+        raise RuntimeError("the STT service takes media URLs only, not uploaded files")
+    try:
+        return stt_service.transcribe(config.STT_URL, job["source"]["url"], job["params"]["lang"],
+                                      config.STT_TIMEOUT_S, beat.update, beat.cancelled.is_set)
+    except stt_service.Cancelled:
+        log.info("job %s cancelled", job["id"])
+        return None
+
+
+def run_locally(client: Client, models: Models, job: dict, job_dir: str, beat: "Heartbeat") -> Optional[dict]:
+    """The job's audio here (downloaded or read from its URL) through an engine on this GPU;
+    None if cancelled"""
+    job_id, params = job["id"], job["params"]
+    if "upload" in job["source"]:
+        beat.update("downloading", 0.0)
+        source = os.path.join(job_dir, "upload")
+        client.download(job["source"]["upload"], source)
+    else:
+        source = job["source"]["url"]
+    duration = audio.get_duration(source)
+    if duration == 0:
+        raise RuntimeError("could not determine audio duration")
+    wav_file = os.path.join(job_dir, "audio.wav")
+    if not audio.convert_to_wav(source, wav_file, duration,
+                                lambda p: beat.update("converting", CONVERT_SHARE * p),
+                                beat.cancelled.is_set):
+        log.info("job %s cancelled", job_id)
+        return None
+    from ..transcriber import Cancelled
+    try:
+        if params.get("kind") == DIARIZE:
+            doc = diarize(client, models, job, job_dir, wav_file, beat)
+        else:
+            beat.update("loading_model", CONVERT_SHARE)
+            transcriber = models.get(params["lang"])
+            beat.update("transcribing", CONVERT_SHARE)
+            doc = transcriber.transcribe(
+                wav_file, profile=params.get("profile"), batch_size=config.BATCH_SIZE,
+                on_progress=lambda p: beat.update("transcribing", CONVERT_SHARE + (1 - CONVERT_SHARE) * p),
+                should_cancel=beat.cancelled.is_set)
+    except Cancelled:
+        log.info("job %s cancelled", job_id)
+        return None
+    models.last_used = time.time()
+    return doc
+
+
 def run_job(client: Client, models: Models, job: dict):
     job_id, params = job["id"], job["params"]
     job_dir = os.path.join(config.WORK_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
     try:
         with Heartbeat(client, job_id) as beat:
-            if "upload" in job["source"]:
-                beat.update("downloading", 0.0)
-                source = os.path.join(job_dir, "upload")
-                client.download(job["source"]["upload"], source)
+            if config.STT_URL and params.get("kind") != DIARIZE:
+                doc = transcribe_by_service(job, beat)
             else:
-                source = job["source"]["url"]
-            duration = audio.get_duration(source)
-            if duration == 0:
-                raise RuntimeError("could not determine audio duration")
-            wav_file = os.path.join(job_dir, "audio.wav")
-            if not audio.convert_to_wav(source, wav_file, duration,
-                                        lambda p: beat.update("converting", CONVERT_SHARE * p),
-                                        beat.cancelled.is_set):
-                log.info("job %s cancelled", job_id)
-                return
-            from ..transcriber import Cancelled
-            try:
-                if params.get("kind") == DIARIZE:
-                    doc = diarize(client, models, job, job_dir, wav_file, beat)
-                else:
-                    beat.update("loading_model", CONVERT_SHARE)
-                    transcriber = models.get(params["lang"])
-                    beat.update("transcribing", CONVERT_SHARE)
-                    doc = transcriber.transcribe(
-                        wav_file, profile=params.get("profile"), batch_size=config.BATCH_SIZE,
-                        on_progress=lambda p: beat.update("transcribing", CONVERT_SHARE + (1 - CONVERT_SHARE) * p),
-                        should_cancel=beat.cancelled.is_set)
-            except Cancelled:
-                log.info("job %s cancelled", job_id)
-                return
-            models.last_used = time.time()
+                doc = run_locally(client, models, job, job_dir, beat)
+        if doc is None:
+            return
         client.result(job_id, doc)
         log.info("job %s done: %.0f s of audio, %d words", job_id, doc["duration_s"], len(doc["words"]))
     except ApiError as e:
@@ -193,8 +222,8 @@ def main(stop: Optional[threading.Event] = None):
         signal.signal(signal.SIGTERM, lambda *_: stop.set())
     client = Client(config.API_URL, config.WORKER_KEY, config.WORKER_ID)
     models = Models()
-    log.info("worker %s: API %s, engines %s, langs %s", config.WORKER_ID, config.API_URL, ",".join(engines),
-             ",".join(langs))
+    log.info("worker %s: API %s, engines %s, langs %s%s", config.WORKER_ID, config.API_URL, ",".join(engines),
+             ",".join(langs), f", transcribing by {config.STT_URL}" if config.STT_URL else "")
     while not stop.is_set():
         try:
             job = client.lease(langs, engines)

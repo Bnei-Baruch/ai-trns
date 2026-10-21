@@ -9,14 +9,15 @@ FORMATS = ("txt", "srt", "json")
 
 def render(doc: dict, fmt: str, fix_rtl: bool = False) -> str:
     """Words document -> txt | srt | json. CPU only, so any format can be rendered again later.
-    SRT uses the whisper_trainer cue layout (ai_trns.cues); fix_rtl adds RTL marks to Hebrew"""
+    SRT uses the whisper_trainer cue layout (ai_trns.cues), or is the SRT the document came with
+    (ai_trns.stt_service); fix_rtl adds RTL marks to Hebrew"""
     if fmt == "txt":
         return doc["text"]
     if fmt == "json":
         return json.dumps(doc, ensure_ascii=False)
     if fmt != "srt":
         raise ValueError(f"unknown format {fmt!r}")
-    content = cues.render_srt(doc)
+    content = doc["srt"] if "srt" in doc else cues.render_srt(doc)
     return fix_rtl_srt(content) if fix_rtl and doc.get("language") == "he" else content
 
 

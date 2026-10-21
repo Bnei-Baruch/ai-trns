@@ -34,6 +34,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 
 from .. import cues
+from ..diarize.srt import parse_srt
 from . import config
 from .auth import Principal, principal
 from .jobs import CANCELLED, DONE, FINAL, JobStore
@@ -132,9 +133,13 @@ def load_segment_results(set_id: str, segment_id: str) -> list:
 
 def chunks_from_words(doc: dict) -> list:
     """Words document -> [{start, end, text}]: the same cues as the job's SRT"""
-    built, _policy = cues.build_cues(doc)
-    chunks = ({"start": c["start_ms"] / 1000, "end": c["end_ms"] / 1000, "text": " ".join(c["text"].split())}
-              for c in built)
+    if "srt" in doc:
+        chunks = ({"start": c["start"], "end": c["end"], "text": " ".join(c["text"].split())}
+                  for c in parse_srt(doc["srt"]))
+    else:
+        built, _policy = cues.build_cues(doc)
+        chunks = ({"start": c["start_ms"] / 1000, "end": c["end_ms"] / 1000, "text": " ".join(c["text"].split())}
+                  for c in built)
     return [c for c in chunks if c["text"]]
 
 

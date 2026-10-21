@@ -18,7 +18,12 @@ ENGINES = _list("AI_TRNS_WORKER_ENGINES") or ["transcribe"]
 SPEAKERS_DIR = os.environ.get("AI_TRNS_SPEAKERS_DIR") or os.path.join(MODELS_DIR, "speakers")
 DIARIZE_PIPELINE = os.environ.get("AI_TRNS_DIARIZE_PIPELINE", "pyannote/speaker-diarization-community-1")
 HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
-# Languages this worker takes jobs for; default: every models/<lang> present ("auto" needs models/en)
+# Transcribe through whisper_trainer's job service at this URL (ai_trns.stt_service) instead of a
+# model here, e.g. http://10.66.1.53:8765. It takes media URLs only, and is Hebrew only
+STT_URL = os.environ.get("AI_TRNS_STT_URL", "").rstrip("/")
+STT_TIMEOUT_S = float(os.environ.get("AI_TRNS_STT_TIMEOUT_S", str(3 * 3600)))
+# Languages this worker takes jobs for; default: every models/<lang> present ("auto" needs models/en),
+# or he with AI_TRNS_STT_URL
 LANGS = _list("AI_TRNS_WORKER_LANGS")
 DEVICE = os.environ.get("AI_TRNS_DEVICE", "cuda")
 COMPUTE_TYPE = os.environ.get("AI_TRNS_COMPUTE_TYPE", "float16")

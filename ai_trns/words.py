@@ -11,7 +11,10 @@ everything built from it (SRT, txt, speakers; CPU, fast).
                  "boundary_correction_s": {"start": float, "end": float}},
       "text": str,                       # transcript: segment texts joined by spaces
       "segments": [{"start_s", "end_s", "text"}],
-      "words": [{"word", "start_s", "end_s", "probability", "interpolated", "segment"}]
+      "words": [{"word", "start_s", "end_s", "probability", "interpolated", "segment"}],
+      "srt": str                         # optional: the SRT of whisper_trainer's service
+                                         # (ai_trns.stt_service, timing source "service_cues"),
+                                         # served as is instead of cues built from the words
     }
 
 Word times are the engine's own, uncorrected: the calibrated boundary

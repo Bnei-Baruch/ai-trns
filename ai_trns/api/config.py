@@ -30,6 +30,9 @@ CORS_ORIGINS = _list("AI_TRNS_CORS_ORIGINS")
 MAX_UPLOAD_MB = int(os.environ.get("AI_TRNS_MAX_UPLOAD_MB", "2048"))
 # Hosts allowed for `url` input; empty = URL input disabled
 ALLOWED_URL_HOSTS = _list("AI_TRNS_ALLOWED_URL_HOSTS")
+# Uploaded audio for jobs of the transcribe engine (transcribe, tadiff, docdiff). Off while workers
+# transcribe through whisper_trainer's service (AI_TRNS_STT_URL), which takes media URLs only
+TRANSCRIBE_UPLOADS = os.environ.get("AI_TRNS_TRANSCRIBE_UPLOADS", "0").lower() in ("1", "true", "yes")
 
 # A job is given to workers at most this many times (lost workers, expired leases)
 MAX_ATTEMPTS = int(os.environ.get("AI_TRNS_MAX_ATTEMPTS", "3"))
