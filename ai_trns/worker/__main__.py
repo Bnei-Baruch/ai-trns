@@ -306,6 +306,23 @@ def run_locally(client: Client, models: Models, job: dict, job_dir: str, beat: "
     return doc
 
 
+RESULT_TRIES, RESULT_RETRY_S = 6, 10.0
+
+
+def send_result(client: Client, job_id: str, doc: dict):
+    """The finished document to the API; an API restarting meanwhile does not lose the work"""
+    for attempt in range(RESULT_TRIES):
+        try:
+            return client.result(job_id, doc)
+        except ApiError:
+            raise
+        except OSError as e:
+            if attempt == RESULT_TRIES - 1:
+                raise
+            log.warning("job %s: result not sent (%s), again in %.0f s", job_id, e, RESULT_RETRY_S)
+            time.sleep(RESULT_RETRY_S)
+
+
 def run_job(client: Client, models: Models, job: dict, shutdown: Optional[threading.Event] = None):
     job_id, params = job["id"], job["params"]
     job_dir = os.path.join(config.WORK_DIR, job_id)
@@ -326,7 +343,7 @@ def run_job(client: Client, models: Models, job: dict, shutdown: Optional[thread
                 doc = run_locally(client, models, job, job_dir, beat)
         if doc is None:
             return
-        client.result(job_id, doc)
+        send_result(client, job_id, doc)
         log.info("job %s done: %.0f s of audio, %d words", job_id, doc["duration_s"], len(doc["words"]))
     except ApiError as e:
         # 409: the job was cancelled or given to another worker meanwhile; nothing to report

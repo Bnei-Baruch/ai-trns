@@ -158,3 +158,29 @@ def test_a_worker_waits_for_gpu_memory(monkeypatch):
     # no nvidia-smi: do not block
     monkeypatch.setattr(w, "free_gpu_mb", lambda: None)
     assert w.gpu_has_room(models)
+
+
+def test_a_result_is_sent_again_while_the_api_restarts(monkeypatch):
+    import urllib.error
+    from ai_trns.worker import __main__ as w
+    monkeypatch.setattr(w, "RESULT_RETRY_S", 0.01)
+    calls = []
+
+    class FlakyClient:
+        def result(self, job_id, doc):
+            calls.append(job_id)
+            if len(calls) < 3:
+                raise urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
+
+    w.send_result(FlakyClient(), "j1", {})
+    assert calls == ["j1"] * 3
+
+    class RejectingClient:
+        def result(self, job_id, doc):
+            calls.append(job_id)
+            raise w.ApiError(409, "not yours")
+
+    calls.clear()
+    with pytest.raises(w.ApiError):
+        w.send_result(RejectingClient(), "j2", {})
+    assert calls == ["j2"]
