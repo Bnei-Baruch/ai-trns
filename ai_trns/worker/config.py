@@ -20,6 +20,10 @@ ENGINES = _list("AI_TRNS_WORKER_ENGINES") or ["transcribe"]
 SPEAKERS_DIR = os.environ.get("AI_TRNS_SPEAKERS_DIR") or os.path.join(MODELS_DIR, "speakers")
 DIARIZE_PIPELINE = os.environ.get("AI_TRNS_DIARIZE_PIPELINE", "pyannote/speaker-diarization-community-1")
 HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
+# A voice sample names, besides its best cluster, every other cluster this similar to it (one voice split by
+# pyannote into several clusters); unset = one cluster per speaker (ai_trns.diarize.mapping.match_samples)
+DIARIZE_EXTRA_THRESHOLD = float(os.environ["AI_TRNS_DIARIZE_EXTRA_THRESHOLD"]) \
+    if os.environ.get("AI_TRNS_DIARIZE_EXTRA_THRESHOLD", "").strip() else None
 # diarize jobs asked for paragraphs: the paragraphing service (ai_trns.paragraphs.service, mdb-lora on `stt`)
 # and its key; unset = speaker turns only
 PARAGRAPHS_URL = os.environ.get("AI_TRNS_PARAGRAPHS_URL", "").rstrip("/")

@@ -3,6 +3,8 @@
 turns: [(start, end, cluster), ...] -- pyannote's (exclusive) speaker turns,
 cluster being its raw label ("SPEAKER_00", ...).
 """
+from typing import Optional
+
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
@@ -122,14 +124,29 @@ def split_cue(cue: dict, words: list[dict], turns: list[tuple], min_piece_words:
     return pieces
 
 
-def match_samples(similarity: np.ndarray, threshold: float) -> dict[int, int]:
+def match_samples(similarity: np.ndarray, threshold: float,
+                  extra_threshold: Optional[float] = None) -> dict[int, int]:
     """similarity: [n_samples, n_clusters] cosine similarities. One-to-one
     assignment maximizing total similarity; pairs below threshold dropped.
+    extra_threshold (None = off): then every cluster left unassigned goes to
+    its most similar sample too, if that sample got a cluster of its own and
+    the similarity is at least extra_threshold -- one voice that diarization
+    split into several clusters gets all of them.
     Returns {cluster_idx: sample_idx}."""
     if similarity.size == 0:
         return {}
     rows, cols = linear_sum_assignment(-similarity)
-    return {int(c): int(r) for r, c in zip(rows, cols) if similarity[r, c] >= threshold}
+    matched = {int(c): int(r) for r, c in zip(rows, cols) if similarity[r, c] >= threshold}
+    if extra_threshold is None:
+        return matched
+    named = set(matched.values())
+    for c in range(similarity.shape[1]):
+        if c in matched:
+            continue
+        r = int(np.argmax(similarity[:, c]))
+        if r in named and similarity[r, c] >= extra_threshold:
+            matched[c] = r
+    return matched
 
 
 def best_per_speaker(names: list[str], similarity: np.ndarray) -> tuple[list[str], np.ndarray]:

@@ -5,7 +5,8 @@ tadiff/transcribe/ctc_align.py): audio + cues -> diarization document (ai_trns.d
 1. pyannote on the whole file: speaker turns, each in an anonymous cluster.
 2. Voice samples of known speakers (built-in ones in SPEAKERS_DIR/<Name>/*, plus any sent with
    the job) are embedded with pyannote's own embedding model and matched one-to-one to the
-   clusters by cosine similarity; the rest stay SPEAKER_NN.
+   clusters by cosine similarity (optionally a speaker also takes the other clusters close enough to it,
+   AI_TRNS_DIARIZE_EXTRA_THRESHOLD); the rest stay SPEAKER_NN.
 3. Every word of a cue is force-aligned with CTC (Meta MMS_FA via torchaudio, text romanized
    by uroman); if that fails, the cue's words are spread over its VAD speech regions.
 4. A cue one speaker dominates gives all its words that speaker; a mixed one labels its words
@@ -29,6 +30,9 @@ AUDIO_EXTS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus", ".aac"}
 PIPELINE = "pyannote/speaker-diarization-community-1"
 # min cosine similarity sample <-> cluster to name the cluster
 MATCH_THRESHOLD = 0.5
+# a speaker already matched also names every other cluster most similar to it at or above this
+# (mapping.match_samples); None = one cluster per speaker
+MATCH_EXTRA_THRESHOLD = None
 # share of a cue one speaker must cover to label it whole
 DOMINANT_RATIO = 0.85
 # smaller speaker runs inside a cue are merged into a neighbour
@@ -115,7 +119,7 @@ class Diarizer:
     """pyannote pipeline, MMS_FA aligner and uroman, loaded once; parameters are passed per call"""
 
     def __init__(self, speakers_dir: str, device: str = "cuda", pipeline: str = PIPELINE,
-                 hf_token: Optional[str] = None):
+                 hf_token: Optional[str] = None, extra_threshold: Optional[float] = MATCH_EXTRA_THRESHOLD):
         import torch
         import torchaudio
         import uroman
@@ -123,6 +127,7 @@ class Diarizer:
 
         self.torch = torch
         self.speakers_dir = speakers_dir
+        self.extra_threshold = extra_threshold
         self.device = torch.device(device if device == "cpu" or torch.cuda.is_available() else "cpu")
         try:
             self.pipeline = Pipeline.from_pretrained(pipeline, token=hf_token)  # pyannote >= 4
@@ -203,7 +208,8 @@ class Diarizer:
         sim = mapping.cosine_similarity(sample_embs, centroids) if names else np.zeros((0, len(labels)))
         speakers, sim = mapping.best_per_speaker(names, sim)
         log.info("speaker/cluster similarity (%s): %s", speakers, np.round(sim, 3).tolist())
-        return {labels[c]: speakers[s] for c, s in mapping.match_samples(sim, MATCH_THRESHOLD).items()}
+        matched = mapping.match_samples(sim, MATCH_THRESHOLD, self.extra_threshold)
+        return {labels[c]: speakers[s] for c, s in matched.items()}
 
     # --- word timings
 

@@ -118,6 +118,26 @@ def test_match_samples_one_to_one_with_threshold():
     assert mapping.match_samples(sim, 0.72) == {0: 1}
 
 
+def test_match_samples_extra_clusters_off_by_default():
+    # cluster 2 is the Rav's voice too, but one-to-one gives it nobody
+    sim = np.array([[0.8, 0.1, 0.6], [0.2, 0.7, 0.1]])
+    assert mapping.match_samples(sim, 0.5) == {0: 0, 1: 1}
+
+
+def test_match_samples_extra_clusters():
+    sim = np.array([[0.8, 0.1, 0.45, 0.3], [0.2, 0.7, 0.1, 0.35]])
+    # cluster 2 -> sample 0 (0.45 >= 0.4); cluster 3 is closest to sample 1, but 0.35 < 0.4
+    assert mapping.match_samples(sim, 0.5, 0.4) == {0: 0, 1: 1, 2: 0}
+    assert mapping.match_samples(sim, 0.5, 0.3) == {0: 0, 1: 1, 2: 0, 3: 1}
+    assert mapping.match_samples(sim, 0.5, 0.5) == {0: 0, 1: 1}
+
+
+def test_match_samples_extra_needs_a_matched_speaker():
+    # sample 1 is below threshold everywhere: it gets no extra cluster either
+    sim = np.array([[0.8, 0.1, 0.2], [0.3, 0.45, 0.48]])
+    assert mapping.match_samples(sim, 0.5, 0.4) == {0: 0}
+
+
 def test_match_samples_empty():
     assert mapping.match_samples(np.zeros((1, 0)), 0.5) == {}
 

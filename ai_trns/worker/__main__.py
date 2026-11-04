@@ -53,7 +53,7 @@ class Models:
     def diarizer(self):
         from ..diarize.engine import Diarizer
         return self._load(DIARIZE, lambda: Diarizer(config.SPEAKERS_DIR, config.DEVICE, config.DIARIZE_PIPELINE,
-                                                    config.HF_TOKEN))
+                                                    config.HF_TOKEN, config.DIARIZE_EXTRA_THRESHOLD))
 
     def unload_if_idle(self):
         if self.loaded and time.time() - self.last_used > config.IDLE_UNLOAD_S:
