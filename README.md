@@ -29,7 +29,6 @@ ai_trns/
   transcriber.py   faster-whisper model + decoding profiles → words document
   api/             FastAPI app, job store with leases
   worker/          worker loop, stdlib HTTP client
-whisper_fullfile_cli.py   one-file CLI for exec-api (legacy, until clients move to the API)
 ```
 
 ## Models
@@ -130,14 +129,3 @@ run as user `ai-trns` from `/home/ai-trns`). `run_worker.sh` puts the pip CUDA l
 faster-whisper 1.2.1 breaks with PyAV ≥ 15; audio is always decoded with ffmpeg, so PyAV is never used.
 
 Tests: `pytest tests` (needs ffmpeg; the worker tests run a real API server and a fake model).
-
-## CLI (exec-api, legacy)
-
-```bash
-python whisper_fullfile_cli.py --input audio.mp3 --srt --txt --lang he --fix-rtl
-```
-
-Writes `output.srt` / `output.txt` / `output.json` (`--json`) and progress to `report_python.log` (ai-tools reads
-`NN%` from it), then `[✓] DONE` or `[✗] ERROR: …`. Options: `--profile`, `--batch-size`, `--out-dir`,
-`--report-file`, `--models-dir`, `--nginx-dir` (`""` disables the copy), `--keep-wav`. `--impl` is accepted and
-ignored (the old SRT implementations were removed).

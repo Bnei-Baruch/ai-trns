@@ -55,3 +55,33 @@
 - Старые сервисы удалены, бэкап есть, клиент без exec/MQTT/stt-api, все страницы ai-tools работают через ai-trns.
 - TODO.md (раздел «Старая схема exec-api» — удалить), README, ARCHITECTURE обновлены.
 - Здесь записано: что удалено, где бэкап, сколько GPU освободилось.
+
+## Ход работ
+
+### Логи Angie (2026-11-04, `ngx.kab.info:/var/log/angie/access.log*`, 20.10–04.11; хоста в формате лога нет — location `/rest/`, `/stt-api/`, `/whisper/` есть только в `conf.d/ai-tools.conf`)
+| location | Запросов | Кто |
+|---|---|---|
+| `/rest/` (exec-api) | 52 | реальные — только страница `https://ai-tools.kab.info/transcription` (20.10, 21.10 — пользователь; **23.10 — другой пользователь, 176.229.114.205, загрузка файла**); остальное — сканеры (404) |
+| `/stt-api/` | 65 | только ai-tools (`/review`, `/stt`) и `localhost:3000/3123` (разработка); последний — 20.10 |
+| `/whisper/` | 21 | только stt-api с `stt` (84.108.114.101 = NAT `stt`); последний — 20.10 |
+Чужих потребителей нет.
+
+### Этап A — сделано 2026-11-04
+- [x] Страница Transcription (`Transcription.jsx`, английская; תמלול — это `Stt.tsx`, она уже была на `/jobs`) переписана на ai-trns
+      `POST /jobs`: файл или ссылка, язык he/en/ru/auto, форматы srt/txt, прогресс задачи, скачивание `/jobs/{id}/result`.
+      ai-tools PR #4 (`feature/ai-trns-only` → `master`, в него вошли `ai-trns-rest` и `feature/transcript-compare`),
+      задеплоено Actions с `master` (run 41795365419).
+- [x] Сервер: воркер с `AI_TRNS_STT_URL` отправляет в whisper_trainer только иврит по URL; загрузки и en/ru/auto — на свои
+      модели. Модели `en` (whisper-large-v3-ct2) и `ru` (antony66 whisper-large-v3-russian ct2) скопированы из
+      `/home/amnonbb/trns/models` в `/home/ai-trns/models`. `AI_TRNS_TRANSCRIBE_UPLOADS=1`. Исправлен профиль `stable`
+      (`log_prob_threshold`). Задеплоено, бэкап `/home/ai-trns/app.bak.20261104094214`, env `ai-trns-api.env.bak.20261104094214`.
+- [x] Проверка (через Angie, ключ сервиса; войти под пользователем Keycloak агент не может — **проверить под пользователем**):
+      загрузка he 2 мин → done за 7 с, SRT с RTL-метками (`fix_rtl`, как делал exec-api); en 1 мин → 7 с; auto → 7 с; CORS preflight 200.
+- [x] Бэкап: `ai-tools:/root/backup-old-20261104/exec-api/` — unit, `trns-config-scripts-logs.tgz` (всё из `/home/amnonbb/trns`
+      кроме `tmp/` 15 ГБ загрузок, `models/` 7,4 ГБ, `hosting/` 2,9 ГБ и mp3; их списки — `*-listing.txt`).
+      Angie: `ngx.kab.info:/root/ai-tools.conf.bak.20261104095453`.
+- [x] Удалено: `exec-api.service` (остановлен, disable, unit удалён; порт 8081 свободен); location `/rest/` в Angie (`angie -t`, reload);
+      в клиенте `exec.js`, `mqtt.js`, `MQTT_URL`/`EXEC_API`/`AI_BACKEND`/`WEB_URL` (код, `.env`, `.env.example`, workflow,
+      Actions variables — значения были: `msg.kab.info`, `https://ai-tools.kab.info/rest`, `…/rest/upload/file`, `https://demux.kab.sh`),
+      пакеты `mqtt`, `rc-upload`; `whisper_fullfile_cli.py` в ai-trns.
+- **Каталог `/home/amnonbb/trns` (25 ГБ, домашний каталог другого человека) не удалён** — решить пользователю.

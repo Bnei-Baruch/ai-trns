@@ -68,7 +68,6 @@ ai-trns/
       config.py            настройки воркера
   scripts/                 запуск и деплой: run_api.sh, run_worker.sh, systemd-юниты, примеры env
   tests/                   pytest: реплики, слова, API, авторизация, воркер против настоящего API
-  whisper_fullfile_cli.py  старый CLI для exec-api (до перевода клиентов на API)
   docs/ARCHITECTURE.md     этот файл
 ```
 
@@ -299,9 +298,8 @@ Ubuntu 24.04, 12 ядер, 15 ГБ RAM, RTX 2080 8 ГБ (Turing), драйвер
 | Воркер | systemd `ai-trns-worker`, id `ai-tools-gpu0`, API по `http://127.0.0.1:8766` |
 | Логи | `journalctl -u ai-trns-api`, `journalctl -u ai-trns-worker` |
 
-Там же работают (их не трогали):
-- `exec-api` (порт 8081, `/home/amnonbb/trns`) — текущий прод транскрипции через старый CLI;
-- `ollama` (`bge-m3`) — тоже использует GPU, по запросу.
+Там же работает `ollama` (`bge-m3`) — тоже использует GPU, по запросу. exec-api (порт 8081, `/home/amnonbb/trns`)
+удалён 2026-11-04: страница Transcription в ai-tools ходит в `/jobs`; бэкап — `TASK-cleanup-old.md`.
 
 Деплой:
 ```bash
@@ -334,17 +332,6 @@ Rocky Linux 9.5 (glibc 2.34), RTX 3070 8 ГБ, 15 ГБ RAM, CUDA 13.1.
 - ходить через Angie;
 - push от API к воркеру.
 
-### Старый путь (exec-api)
-
-ai-tools → `/rest/` → exec-api на `ai-tools` → `whisper_fullfile_cli.py`. Аргументы приходят из конфига сервиса `python`, результат пишется в `output.srt` и `report_python.log`.
-
-`whisper_fullfile_cli.py` из этой ветки совместим со старым CLI:
-- те же аргументы и файлы;
-- `--impl` принимается и игнорируется;
-- `--fix-rtl` работает.
-
-В прод exec-api эта ветка не ставилась.
-
 ## 10. Решения и почему
 
 | Решение | Почему |
@@ -358,6 +345,6 @@ ai-tools → `/rest/` → exec-api на `ai-tools` → `whisper_fullfile_cli.py`
 | tadiff / docdiff — распознавание + сравнение на API | Второй Whisper на GPU не нужен, сравнение дешёвое и повторяемое из слов |
 | diarize — отдельный движок, SRT на API | pyannote и MMS тяжёлые и нужны не на каждом GPU; документ со словами и спикерами позволяет перестроить SRT без GPU |
 | HTTP-клиент воркера только на stdlib | Воркер можно запустить внутри locked-окружения whisper_trainer, не добавляя туда пакеты |
-| Модель выгружается при простое | GPU 8 ГБ делят с exec-api, ollama, stt-api. Загрузка занимает около 1 с |
+| Модель выгружается при простое | GPU 8 ГБ делят воркеры ai-trns (live, transcribe, diarize) и ollama. Загрузка занимает около 1 с |
 | Одна задача на GPU | Две задачи на одном GPU не ускоряют работу: узкое место — CPU |
 | Пакет `ai_trns/` внутри репо | Запуск `python -m ai_trns.api` и `python -m ai_trns.worker` из любой папки, нет конфликтов имён (`config`, `audio`) |

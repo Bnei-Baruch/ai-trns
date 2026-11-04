@@ -29,12 +29,6 @@
 - [x] Тесты (38): реплики (перенесены из whisper_trainer), слова, API, протокол воркера, аренда, отмена,
       авторизация, настоящий воркер против настоящего API-сервера.
 
-### CLI для exec-api (совместимость)
-- [x] Те же аргументы и файлы (`output.*`, `report_python.log`). `--impl` принимается и игнорируется.
-- [x] `--out-dir`, `--report-file`, `--models-dir`, `--nginx-dir`, `--json`, `--profile`, `--batch-size`.
-- [x] Финальный статус `[✓] DONE` / `[✗] ERROR: …`. Реальный прогресс по сегментам. `output.wav` удаляется при
-      ошибке и при SIGTERM.
-
 ### Развёрнуто
 - [x] `ai-tools` (10.66.24.55): systemd `ai-trns-api` (порт 8766) и `ai-trns-worker` (RTX 2080) от пользователя
       `ai-trns` в `/home/ai-trns`. Проверено: урок 41 мин → SRT за 30 с. exec-api и ollama не тронуты.
@@ -59,10 +53,10 @@
       перезаписи: `main/KB74kOBz` оставлен новый, от whisper_trainer; бэкап `review.bak.*`).
 - [ ] Проверить настоящий токен Keycloak пользователя (тестами покрыто, вживую не проверено).
 - [ ] Решить, нужна ли роль администратора (`AI_TRNS_ADMIN_ROLE`).
-- [ ] Клиент ai-tools: страница транскрипции через API (`POST /jobs` с `kc.token`, опрос статуса, скачивание)
-      вместо exec-api + MQTT.
+- [x] Клиент ai-tools: страница Transcription через API (`POST /jobs` с токеном Keycloak, опрос, скачивание)
+      вместо exec-api + MQTT (2026-11-04, ai-tools PR #4 → master, задеплоено). exec-api удалён — `TASK-cleanup-old.md`.
 - [ ] URL-задачи с `cdn.kabbalahmedia.info`: прогнать настоящую ссылку.
-- [ ] Влить `rest-api` в master после переключения клиентов. Потом убрать `whisper_fullfile_cli.py` и exec-api.
+- [ ] Влить ветки ai-trns (`review` → `cleanup-old`) в master. `whisper_fullfile_cli.py` и exec-api убраны (2026-11-04).
 
 ### whisper_trainer (полный прод-конвейер)
 - [x] Временно: транскрипт из их сервиса `10.66.1.53:8765` (`ai_trns/stt_service.py`, `AI_TRNS_STT_URL` у воркера),
@@ -133,12 +127,3 @@
 - [ ] Предзагрузка следующей задачи в воркере (скачать и конвертировать, пока GPU занят) — для коротких файлов.
 - [ ] Приоритеты в очереди (короткие файлы, review ниже), если понадобится.
 
-## Старая схема exec-api (для справки)
-
-exec-api запускает CLI как сервис из своего конфига, например
-`{"ID": "python", "Name": "python3", "Args": ["whisper_fullfile_cli.py", "--input", "...", "--srt", "--lang", "he", "--fix-rtl"]}`.
-Процесс наследует cwd exec-api, статус читается через `/:ep/report/python` → `report_python.log`.
-
-Открытые проблемы exec-api (уйдут вместе с ним):
-- **Watchdog** (`api/exec.go:28`) раз в 30 с перезапускает завершённый сервис без PID, exit code не проверяет.
-- **REST exec-api** открыт: GET для start/stop, CORS `*`, авторизация выключена (`authentication.enable=false`).
