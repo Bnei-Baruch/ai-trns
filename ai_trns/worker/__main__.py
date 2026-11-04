@@ -190,8 +190,9 @@ def add_paragraphs(doc: dict) -> None:
         log.warning("paragraphs: %s", e)
         stats["paragraphs_error"] = str(e)
         return
-    doc["paragraph_starts"] = build.starts_from_sentences(index, offsets, reply["sentences"], reply["breaks"])
-    doc["paragraphs_model"] = "mdb-lora paragraphing"
+    starts = build.starts_from_sentences(index, offsets, reply["sentences"], reply["breaks"])
+    doc["paragraph_starts"] = build.thin_starts(doc["words"], starts, config.PARAGRAPHS_MIN_WORDS)
+    doc["paragraphs_model"] = "mdb-lora " + (reply.get("adapter") or "paragraphing")
     log.info("paragraphs: %d breaks in %s s", len(doc["paragraph_starts"]), reply.get("seconds"))
 
 

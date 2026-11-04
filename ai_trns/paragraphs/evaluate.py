@@ -15,6 +15,7 @@ import re
 import sys
 from collections import Counter
 from difflib import SequenceMatcher
+from typing import Optional
 
 from .build import norm
 
@@ -67,12 +68,13 @@ def _prf(tp: int, pred: int, gold: int) -> dict:
     p = tp / pred if pred else 0.0
     r = tp / gold if gold else 0.0
     return {"p": round(p, 3), "r": round(r, 3), "f1": round(2 * p * r / (p + r), 3) if p + r else 0.0,
-            "pred": pred, "gold": gold}
+            "tp": tp, "pred": pred, "gold": gold}
 
 
-def evaluate(text: str, result: dict) -> dict:
+def evaluate(text: str, result: dict, pairs: Optional[list[tuple[int, int]]] = None) -> dict:
+    """pairs: align(human_words(text), model_words(result)) if known (it depends on the words only)"""
     human, model = human_words(text), model_words(result)
-    pairs = align(human, model)
+    pairs = align(human, model) if pairs is None else pairs
     confusion = Counter((human[a]["label"], model[b]["label"]) for a, b in pairs)
     per_label = {}
     for label in (RAV, READER, STUDENT):

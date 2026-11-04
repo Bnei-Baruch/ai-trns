@@ -1,0 +1,516 @@
+m0  none                                          exact P 0.643 R 0.045 F1 0.085 | tol1 F1 0.085 | pred 14 gold 198
+m0  oracle                                        exact P 0.953 R 0.914 F1 0.933 | tol1 F1 0.954 | pred 190 gold 198
+m0  pauses n=0.3 m=0 sent_only=False              exact P 0.028 R 0.944 F1 0.055 | tol1 F1 0.057 | pred 6643 gold 198
+m0  pauses n=0.3 m=0 sent_only=True               exact P 0.104 R 0.884 F1 0.187 | tol1 F1 0.209 | pred 1677 gold 198
+m0  pauses n=0.3 m=20 sent_only=False             exact P 0.037 R 0.197 F1 0.062 | tol1 F1 0.290 | pred 1065 gold 198
+m0  pauses n=0.3 m=20 sent_only=True              exact P 0.133 R 0.490 F1 0.209 | tol1 F1 0.378 | pred 732 gold 198
+m0  pauses n=0.3 m=40 sent_only=False             exact P 0.073 R 0.182 F1 0.104 | tol1 F1 0.444 | pred 491 gold 198
+m0  pauses n=0.3 m=40 sent_only=True              exact P 0.164 R 0.318 F1 0.217 | tol1 F1 0.485 | pred 383 gold 198
+m0  pauses n=0.3 m=60 sent_only=False             exact P 0.061 R 0.091 F1 0.073 | tol1 F1 0.533 | pred 297 gold 198
+m0  pauses n=0.3 m=60 sent_only=True              exact P 0.156 R 0.187 F1 0.170 | tol1 F1 0.492 | pred 237 gold 198
+m0  pauses n=0.3 m=80 sent_only=False             exact P 0.124 R 0.126 F1 0.125 | tol1 F1 0.451 | pred 201 gold 198
+m0  pauses n=0.3 m=80 sent_only=True              exact P 0.181 R 0.157 F1 0.168 | tol1 F1 0.407 | pred 171 gold 198
+m0  pauses n=0.5 m=0 sent_only=False              exact P 0.032 R 0.909 F1 0.062 | tol1 F1 0.067 | pred 5644 gold 198
+m0  pauses n=0.5 m=0 sent_only=True               exact P 0.106 R 0.843 F1 0.189 | tol1 F1 0.221 | pred 1573 gold 198
+m0  pauses n=0.5 m=20 sent_only=False             exact P 0.037 R 0.192 F1 0.062 | tol1 F1 0.295 | pred 1029 gold 198
+m0  pauses n=0.5 m=20 sent_only=True              exact P 0.134 R 0.475 F1 0.209 | tol1 F1 0.392 | pred 701 gold 198
+m0  pauses n=0.5 m=40 sent_only=False             exact P 0.071 R 0.172 F1 0.100 | tol1 F1 0.448 | pred 480 gold 198
+m0  pauses n=0.5 m=40 sent_only=True              exact P 0.156 R 0.293 F1 0.204 | tol1 F1 0.492 | pred 371 gold 198
+m0  pauses n=0.5 m=60 sent_only=False             exact P 0.058 R 0.086 F1 0.069 | tol1 F1 0.524 | pred 294 gold 198
+m0  pauses n=0.5 m=60 sent_only=True              exact P 0.155 R 0.182 F1 0.167 | tol1 F1 0.484 | pred 232 gold 198
+m0  pauses n=0.5 m=80 sent_only=False             exact P 0.118 R 0.121 F1 0.120 | tol1 F1 0.454 | pred 203 gold 198
+m0  pauses n=0.5 m=80 sent_only=True              exact P 0.174 R 0.146 F1 0.159 | tol1 F1 0.411 | pred 167 gold 198
+m0  pauses n=0.7 m=0 sent_only=False              exact P 0.039 R 0.848 F1 0.074 | tol1 F1 0.086 | pred 4332 gold 198
+m0  pauses n=0.7 m=0 sent_only=True               exact P 0.114 R 0.798 F1 0.200 | tol1 F1 0.242 | pred 1382 gold 198
+m0  pauses n=0.7 m=20 sent_only=False             exact P 0.054 R 0.258 F1 0.089 | tol1 F1 0.317 | pred 951 gold 198
+m0  pauses n=0.7 m=20 sent_only=True              exact P 0.144 R 0.475 F1 0.221 | tol1 F1 0.400 | pred 651 gold 198
+m0  pauses n=0.7 m=40 sent_only=False             exact P 0.077 R 0.177 F1 0.107 | tol1 F1 0.459 | pred 456 gold 198
+m0  pauses n=0.7 m=40 sent_only=True              exact P 0.165 R 0.298 F1 0.212 | tol1 F1 0.489 | pred 358 gold 198
+m0  pauses n=0.7 m=60 sent_only=False             exact P 0.071 R 0.101 F1 0.084 | tol1 F1 0.509 | pred 281 gold 198
+m0  pauses n=0.7 m=60 sent_only=True              exact P 0.179 R 0.202 F1 0.190 | tol1 F1 0.489 | pred 223 gold 198
+m0  pauses n=0.7 m=80 sent_only=False             exact P 0.116 R 0.116 F1 0.116 | tol1 F1 0.428 | pred 199 gold 198
+m0  pauses n=0.7 m=80 sent_only=True              exact P 0.199 R 0.162 F1 0.178 | tol1 F1 0.429 | pred 161 gold 198
+m0  pauses n=1.0 m=0 sent_only=False              exact P 0.054 R 0.763 F1 0.100 | tol1 F1 0.128 | pred 2817 gold 198
+m0  pauses n=1.0 m=0 sent_only=True               exact P 0.128 R 0.712 F1 0.217 | tol1 F1 0.274 | pred 1102 gold 198
+m0  pauses n=1.0 m=20 sent_only=False             exact P 0.068 R 0.278 F1 0.110 | tol1 F1 0.339 | pred 806 gold 198
+m0  pauses n=1.0 m=20 sent_only=True              exact P 0.154 R 0.439 F1 0.228 | tol1 F1 0.412 | pred 565 gold 198
+m0  pauses n=1.0 m=40 sent_only=False             exact P 0.090 R 0.187 F1 0.121 | tol1 F1 0.456 | pred 412 gold 198
+m0  pauses n=1.0 m=40 sent_only=True              exact P 0.183 R 0.298 F1 0.226 | tol1 F1 0.468 | pred 323 gold 198
+m0  pauses n=1.0 m=60 sent_only=False             exact P 0.087 R 0.116 F1 0.100 | tol1 F1 0.508 | pred 263 gold 198
+m0  pauses n=1.0 m=60 sent_only=True              exact P 0.183 R 0.192 F1 0.187 | tol1 F1 0.473 | pred 208 gold 198
+m0  pauses n=1.0 m=80 sent_only=False             exact P 0.138 R 0.131 F1 0.135 | tol1 F1 0.399 | pred 188 gold 198
+m0  pauses n=1.0 m=80 sent_only=True              exact P 0.222 R 0.172 F1 0.194 | tol1 F1 0.433 | pred 153 gold 198
+m0  pauses n=1.5 m=0 sent_only=False              exact P 0.078 R 0.596 F1 0.138 | tol1 F1 0.205 | pred 1517 gold 198
+m0  pauses n=1.5 m=0 sent_only=True               exact P 0.150 R 0.540 F1 0.235 | tol1 F1 0.329 | pred 714 gold 198
+m0  pauses n=1.5 m=20 sent_only=False             exact P 0.094 R 0.293 F1 0.143 | tol1 F1 0.371 | pred 616 gold 198
+m0  pauses n=1.5 m=20 sent_only=True              exact P 0.173 R 0.369 F1 0.236 | tol1 F1 0.410 | pred 421 gold 198
+m0  pauses n=1.5 m=40 sent_only=False             exact P 0.132 R 0.227 F1 0.167 | tol1 F1 0.465 | pred 340 gold 198
+m0  pauses n=1.5 m=40 sent_only=True              exact P 0.219 R 0.283 F1 0.247 | tol1 F1 0.449 | pred 256 gold 198
+m0  pauses n=1.5 m=60 sent_only=False             exact P 0.094 R 0.111 F1 0.102 | tol1 F1 0.454 | pred 234 gold 198
+m0  pauses n=1.5 m=60 sent_only=True              exact P 0.210 R 0.187 F1 0.198 | tol1 F1 0.433 | pred 176 gold 198
+m0  pauses n=1.5 m=80 sent_only=False             exact P 0.169 R 0.136 F1 0.151 | tol1 F1 0.419 | pred 160 gold 198
+m0  pauses n=1.5 m=80 sent_only=True              exact P 0.265 R 0.182 F1 0.216 | tol1 F1 0.389 | pred 136 gold 198
+m0  pauses n=2.0 m=0 sent_only=False              exact P 0.110 R 0.475 F1 0.179 | tol1 F1 0.283 | pred 855 gold 198
+m0  pauses n=2.0 m=0 sent_only=True               exact P 0.186 R 0.434 F1 0.260 | tol1 F1 0.363 | pred 463 gold 198
+m0  pauses n=2.0 m=20 sent_only=False             exact P 0.138 R 0.298 F1 0.189 | tol1 F1 0.419 | pred 427 gold 198
+m0  pauses n=2.0 m=20 sent_only=True              exact P 0.220 R 0.323 F1 0.262 | tol1 F1 0.429 | pred 291 gold 198
+m0  pauses n=2.0 m=40 sent_only=False             exact P 0.168 R 0.227 F1 0.193 | tol1 F1 0.485 | pred 268 gold 198
+m0  pauses n=2.0 m=40 sent_only=True              exact P 0.247 R 0.247 F1 0.247 | tol1 F1 0.429 | pred 198 gold 198
+m0  pauses n=2.0 m=60 sent_only=False             exact P 0.167 R 0.162 F1 0.164 | tol1 F1 0.451 | pred 192 gold 198
+m0  pauses n=2.0 m=60 sent_only=True              exact P 0.255 R 0.187 F1 0.216 | tol1 F1 0.408 | pred 145 gold 198
+m0  pauses n=2.0 m=80 sent_only=False             exact P 0.221 R 0.157 F1 0.183 | tol1 F1 0.438 | pred 140 gold 198
+m0  pauses n=2.0 m=80 sent_only=True              exact P 0.297 R 0.167 F1 0.214 | tol1 F1 0.337 | pred 111 gold 198
+m0  pauses n=2.5 m=0 sent_only=False              exact P 0.131 R 0.343 F1 0.190 | tol1 F1 0.326 | pred 519 gold 198
+m0  pauses n=2.5 m=0 sent_only=True               exact P 0.207 R 0.323 F1 0.252 | tol1 F1 0.383 | pred 309 gold 198
+m0  pauses n=2.5 m=20 sent_only=False             exact P 0.149 R 0.232 F1 0.182 | tol1 F1 0.419 | pred 308 gold 198
+m0  pauses n=2.5 m=20 sent_only=True              exact P 0.227 R 0.247 F1 0.237 | tol1 F1 0.430 | pred 216 gold 198
+m0  pauses n=2.5 m=40 sent_only=False             exact P 0.200 R 0.207 F1 0.203 | tol1 F1 0.467 | pred 205 gold 198
+m0  pauses n=2.5 m=40 sent_only=True              exact P 0.263 R 0.202 F1 0.229 | tol1 F1 0.406 | pred 152 gold 198
+m0  pauses n=2.5 m=60 sent_only=False             exact P 0.204 R 0.152 F1 0.174 | tol1 F1 0.417 | pred 147 gold 198
+m0  pauses n=2.5 m=60 sent_only=True              exact P 0.286 R 0.172 F1 0.215 | tol1 F1 0.391 | pred 119 gold 198
+m0  pauses n=2.5 m=80 sent_only=False             exact P 0.241 R 0.136 F1 0.174 | tol1 F1 0.400 | pred 112 gold 198
+m0  pauses n=2.5 m=80 sent_only=True              exact P 0.315 R 0.141 F1 0.195 | tol1 F1 0.328 | pred 89 gold 198
+m0  pauses n=3.0 m=0 sent_only=False              exact P 0.166 R 0.247 F1 0.199 | tol1 F1 0.325 | pred 295 gold 198
+m0  pauses n=3.0 m=0 sent_only=True               exact P 0.245 R 0.227 F1 0.236 | tol1 F1 0.335 | pred 184 gold 198
+m0  pauses n=3.0 m=20 sent_only=False             exact P 0.210 R 0.207 F1 0.209 | tol1 F1 0.382 | pred 195 gold 198
+m0  pauses n=3.0 m=20 sent_only=True              exact P 0.286 R 0.192 F1 0.230 | tol1 F1 0.350 | pred 133 gold 198
+m0  pauses n=3.0 m=40 sent_only=False             exact P 0.239 R 0.172 F1 0.200 | tol1 F1 0.406 | pred 142 gold 198
+m0  pauses n=3.0 m=40 sent_only=True              exact P 0.311 R 0.162 F1 0.213 | tol1 F1 0.339 | pred 103 gold 198
+m0  pauses n=3.0 m=60 sent_only=False             exact P 0.272 R 0.141 F1 0.186 | tol1 F1 0.365 | pred 103 gold 198
+m0  pauses n=3.0 m=60 sent_only=True              exact P 0.333 R 0.136 F1 0.194 | tol1 F1 0.301 | pred 81 gold 198
+m0  pauses n=3.0 m=80 sent_only=False             exact P 0.322 R 0.141 F1 0.196 | tol1 F1 0.344 | pred 87 gold 198
+m0  pauses n=3.0 m=80 sent_only=True              exact P 0.368 R 0.126 F1 0.188 | tol1 F1 0.278 | pred 68 gold 198
+m0  pauses n=4.0 m=0 sent_only=False              exact P 0.265 R 0.157 F1 0.197 | tol1 F1 0.279 | pred 117 gold 198
+m0  pauses n=4.0 m=0 sent_only=True               exact P 0.338 R 0.131 F1 0.189 | tol1 F1 0.240 | pred 77 gold 198
+m0  pauses n=4.0 m=20 sent_only=False             exact P 0.313 R 0.131 F1 0.185 | tol1 F1 0.285 | pred 83 gold 198
+m0  pauses n=4.0 m=20 sent_only=True              exact P 0.373 R 0.111 F1 0.171 | tol1 F1 0.226 | pred 59 gold 198
+m0  pauses n=4.0 m=40 sent_only=False             exact P 0.397 R 0.126 F1 0.192 | tol1 F1 0.299 | pred 63 gold 198
+m0  pauses n=4.0 m=40 sent_only=True              exact P 0.447 R 0.106 F1 0.171 | tol1 F1 0.220 | pred 47 gold 198
+m0  pauses n=4.0 m=60 sent_only=False             exact P 0.412 R 0.106 F1 0.169 | tol1 F1 0.265 | pred 51 gold 198
+m0  pauses n=4.0 m=60 sent_only=True              exact P 0.450 R 0.091 F1 0.151 | tol1 F1 0.202 | pred 40 gold 198
+m0  pauses n=4.0 m=80 sent_only=False             exact P 0.444 R 0.101 F1 0.165 | tol1 F1 0.239 | pred 45 gold 198
+m0  pauses n=4.0 m=80 sent_only=True              exact P 0.447 R 0.086 F1 0.144 | tol1 F1 0.186 | pred 38 gold 198
+m0  texttiling w=2 c=0.0 k=0                      exact P 0.140 R 0.444 F1 0.213 | tol1 F1 0.345 | pred 630 gold 198
+m0  texttiling w=2 c=0.0 k=20                     exact P 0.164 R 0.374 F1 0.228 | tol1 F1 0.401 | pred 451 gold 198
+m0  texttiling w=2 c=0.0 k=40                     exact P 0.171 R 0.273 F1 0.210 | tol1 F1 0.389 | pred 316 gold 198
+m0  texttiling w=2 c=0.0 k=60                     exact P 0.160 R 0.207 F1 0.181 | tol1 F1 0.339 | pred 256 gold 198
+m0  texttiling w=2 c=0.5 k=0                      exact P 0.157 R 0.318 F1 0.210 | tol1 F1 0.347 | pred 402 gold 198
+m0  texttiling w=2 c=0.5 k=20                     exact P 0.160 R 0.268 F1 0.200 | tol1 F1 0.366 | pred 332 gold 198
+m0  texttiling w=2 c=0.5 k=40                     exact P 0.163 R 0.207 F1 0.182 | tol1 F1 0.342 | pred 252 gold 198
+m0  texttiling w=2 c=0.5 k=60                     exact P 0.156 R 0.167 F1 0.161 | tol1 F1 0.298 | pred 211 gold 198
+m0  texttiling w=2 c=1.0 k=0                      exact P 0.181 R 0.227 F1 0.202 | tol1 F1 0.305 | pred 248 gold 198
+m0  texttiling w=2 c=1.0 k=20                     exact P 0.187 R 0.207 F1 0.197 | tol1 F1 0.317 | pred 219 gold 198
+m0  texttiling w=2 c=1.0 k=40                     exact P 0.177 R 0.162 F1 0.169 | tol1 F1 0.296 | pred 181 gold 198
+m0  texttiling w=2 c=1.0 k=60                     exact P 0.172 R 0.146 F1 0.158 | tol1 F1 0.278 | pred 169 gold 198
+m0  texttiling w=2 c=1.5 k=0                      exact P 0.188 R 0.141 F1 0.161 | tol1 F1 0.271 | pred 149 gold 198
+m0  texttiling w=2 c=1.5 k=20                     exact P 0.190 R 0.131 F1 0.155 | tol1 F1 0.275 | pred 137 gold 198
+m0  texttiling w=2 c=1.5 k=40                     exact P 0.185 R 0.111 F1 0.139 | tol1 F1 0.259 | pred 119 gold 198
+m0  texttiling w=2 c=1.5 k=60                     exact P 0.184 R 0.106 F1 0.135 | tol1 F1 0.244 | pred 114 gold 198
+m0  texttiling w=3 c=0.0 k=0                      exact P 0.134 R 0.414 F1 0.203 | tol1 F1 0.336 | pred 611 gold 198
+m0  texttiling w=3 c=0.0 k=20                     exact P 0.162 R 0.354 F1 0.222 | tol1 F1 0.394 | pred 432 gold 198
+m0  texttiling w=3 c=0.0 k=40                     exact P 0.161 R 0.253 F1 0.197 | tol1 F1 0.366 | pred 310 gold 198
+m0  texttiling w=3 c=0.0 k=60                     exact P 0.156 R 0.202 F1 0.176 | tol1 F1 0.326 | pred 256 gold 198
+m0  texttiling w=3 c=0.5 k=0                      exact P 0.157 R 0.293 F1 0.204 | tol1 F1 0.352 | pred 370 gold 198
+m0  texttiling w=3 c=0.5 k=20                     exact P 0.164 R 0.253 F1 0.199 | tol1 F1 0.359 | pred 304 gold 198
+m0  texttiling w=3 c=0.5 k=40                     exact P 0.177 R 0.212 F1 0.193 | tol1 F1 0.336 | pred 237 gold 198
+m0  texttiling w=3 c=0.5 k=60                     exact P 0.170 R 0.177 F1 0.173 | tol1 F1 0.287 | pred 206 gold 198
+m0  texttiling w=3 c=1.0 k=0                      exact P 0.188 R 0.202 F1 0.195 | tol1 F1 0.302 | pred 213 gold 198
+m0  texttiling w=3 c=1.0 k=20                     exact P 0.196 R 0.192 F1 0.194 | tol1 F1 0.286 | pred 194 gold 198
+m0  texttiling w=3 c=1.0 k=40                     exact P 0.207 R 0.177 F1 0.191 | tol1 F1 0.272 | pred 169 gold 198
+m0  texttiling w=3 c=1.0 k=60                     exact P 0.191 R 0.146 F1 0.166 | tol1 F1 0.234 | pred 152 gold 198
+m0  texttiling w=3 c=1.5 k=0                      exact P 0.197 R 0.136 F1 0.161 | tol1 F1 0.227 | pred 137 gold 198
+m0  texttiling w=3 c=1.5 k=20                     exact P 0.194 R 0.131 F1 0.157 | tol1 F1 0.223 | pred 134 gold 198
+m0  texttiling w=3 c=1.5 k=40                     exact P 0.205 R 0.126 F1 0.156 | tol1 F1 0.212 | pred 122 gold 198
+m0  texttiling w=3 c=1.5 k=60                     exact P 0.204 R 0.116 F1 0.148 | tol1 F1 0.193 | pred 113 gold 198
+m0  texttiling w=4 c=0.0 k=0                      exact P 0.133 R 0.414 F1 0.201 | tol1 F1 0.338 | pred 618 gold 198
+m0  texttiling w=4 c=0.0 k=20                     exact P 0.167 R 0.348 F1 0.225 | tol1 F1 0.386 | pred 414 gold 198
+m0  texttiling w=4 c=0.0 k=40                     exact P 0.188 R 0.293 F1 0.229 | tol1 F1 0.368 | pred 308 gold 198
+m0  texttiling w=4 c=0.0 k=60                     exact P 0.202 R 0.253 F1 0.225 | tol1 F1 0.342 | pred 247 gold 198
+m0  texttiling w=4 c=0.5 k=0                      exact P 0.173 R 0.318 F1 0.224 | tol1 F1 0.320 | pred 365 gold 198
+m0  texttiling w=4 c=0.5 k=20                     exact P 0.206 R 0.293 F1 0.242 | tol1 F1 0.342 | pred 282 gold 198
+m0  texttiling w=4 c=0.5 k=40                     exact P 0.219 R 0.268 F1 0.241 | tol1 F1 0.332 | pred 242 gold 198
+m0  texttiling w=4 c=0.5 k=60                     exact P 0.234 R 0.237 F1 0.236 | tol1 F1 0.306 | pred 201 gold 198
+m0  texttiling w=4 c=1.0 k=0                      exact P 0.179 R 0.212 F1 0.194 | tol1 F1 0.268 | pred 235 gold 198
+m0  texttiling w=4 c=1.0 k=20                     exact P 0.199 R 0.207 F1 0.203 | tol1 F1 0.282 | pred 206 gold 198
+m0  texttiling w=4 c=1.0 k=40                     exact P 0.207 R 0.192 F1 0.199 | tol1 F1 0.272 | pred 184 gold 198
+m0  texttiling w=4 c=1.0 k=60                     exact P 0.228 R 0.187 F1 0.206 | tol1 F1 0.256 | pred 162 gold 198
+m0  texttiling w=4 c=1.5 k=0                      exact P 0.244 R 0.167 F1 0.198 | tol1 F1 0.234 | pred 135 gold 198
+m0  texttiling w=4 c=1.5 k=20                     exact P 0.248 R 0.162 F1 0.196 | tol1 F1 0.239 | pred 129 gold 198
+m0  texttiling w=4 c=1.5 k=40                     exact P 0.248 R 0.152 F1 0.188 | tol1 F1 0.226 | pred 121 gold 198
+m0  texttiling w=4 c=1.5 k=60                     exact P 0.254 R 0.146 F1 0.186 | tol1 F1 0.218 | pred 114 gold 198
+m0  texttiling w=6 c=0.0 k=0                      exact P 0.129 R 0.399 F1 0.195 | tol1 F1 0.303 | pred 613 gold 198
+m0  texttiling w=6 c=0.0 k=20                     exact P 0.144 R 0.273 F1 0.188 | tol1 F1 0.352 | pred 376 gold 198
+m0  texttiling w=6 c=0.0 k=40                     exact P 0.157 R 0.217 F1 0.182 | tol1 F1 0.347 | pred 274 gold 198
+m0  texttiling w=6 c=0.0 k=60                     exact P 0.143 R 0.167 F1 0.154 | tol1 F1 0.317 | pred 231 gold 198
+m0  texttiling w=6 c=0.5 k=0                      exact P 0.162 R 0.278 F1 0.204 | tol1 F1 0.294 | pred 340 gold 198
+m0  texttiling w=6 c=0.5 k=20                     exact P 0.161 R 0.197 F1 0.177 | tol1 F1 0.314 | pred 242 gold 198
+m0  texttiling w=6 c=0.5 k=40                     exact P 0.158 R 0.162 F1 0.160 | tol1 F1 0.285 | pred 202 gold 198
+m0  texttiling w=6 c=0.5 k=60                     exact P 0.144 R 0.131 F1 0.137 | tol1 F1 0.264 | pred 181 gold 198
+m0  texttiling w=6 c=1.0 k=0                      exact P 0.164 R 0.167 F1 0.165 | tol1 F1 0.251 | pred 201 gold 198
+m0  texttiling w=6 c=1.0 k=20                     exact P 0.167 R 0.141 F1 0.153 | tol1 F1 0.251 | pred 168 gold 198
+m0  texttiling w=6 c=1.0 k=40                     exact P 0.174 R 0.131 F1 0.150 | tol1 F1 0.236 | pred 149 gold 198
+m0  texttiling w=6 c=1.0 k=60                     exact P 0.153 R 0.106 F1 0.125 | tol1 F1 0.221 | pred 137 gold 198
+m0  texttiling w=6 c=1.5 k=0                      exact P 0.185 R 0.116 F1 0.143 | tol1 F1 0.230 | pred 124 gold 198
+m0  texttiling w=6 c=1.5 k=20                     exact P 0.192 R 0.116 F1 0.145 | tol1 F1 0.233 | pred 120 gold 198
+m0  texttiling w=6 c=1.5 k=40                     exact P 0.195 R 0.111 F1 0.141 | tol1 F1 0.225 | pred 113 gold 198
+m0  texttiling w=6 c=1.5 k=60                     exact P 0.179 R 0.096 F1 0.125 | tol1 F1 0.217 | pred 106 gold 198
+m0  adapter paragraphing k=0                      exact P 0.272 R 0.475 F1 0.346 | tol1 F1 0.497 | pred 345 gold 198
+m0  adapter paragraphing k=10                     exact P 0.284 R 0.460 F1 0.351 | tol1 F1 0.510 | pred 320 gold 198
+m0  adapter paragraphing k=20                     exact P 0.295 R 0.449 F1 0.356 | tol1 F1 0.520 | pred 302 gold 198
+m0  adapter paragraphing k=30                     exact P 0.309 R 0.429 F1 0.359 | tol1 F1 0.516 | pred 275 gold 198
+m0  adapter paragraphing k=40                     exact P 0.342 R 0.394 F1 0.366 | tol1 F1 0.493 | pred 228 gold 198
+m0  adapter paragraphing k=50                     exact P 0.333 R 0.323 F1 0.328 | tol1 F1 0.451 | pred 192 gold 198
+m0  adapter paragraphing k=60                     exact P 0.331 R 0.278 F1 0.302 | tol1 F1 0.440 | pred 166 gold 198
+m0  adapter paragraphing k=80                     exact P 0.380 R 0.232 F1 0.288 | tol1 F1 0.389 | pred 121 gold 198
+m0  adapter paragraphing_asr k=0                  exact P 0.251 R 0.515 F1 0.338 | tol1 F1 0.450 | pred 406 gold 198
+m0  adapter paragraphing_asr k=10                 exact P 0.288 R 0.485 F1 0.362 | tol1 F1 0.501 | pred 333 gold 198
+m0  adapter paragraphing_asr k=20                 exact P 0.317 R 0.460 F1 0.375 | tol1 F1 0.520 | pred 287 gold 198
+m0  adapter paragraphing_asr k=30                 exact P 0.325 R 0.404 F1 0.360 | tol1 F1 0.518 | pred 246 gold 198
+m0  adapter paragraphing_asr k=40                 exact P 0.364 R 0.384 F1 0.373 | tol1 F1 0.521 | pred 209 gold 198
+m0  adapter paragraphing_asr k=50                 exact P 0.391 R 0.354 F1 0.371 | tol1 F1 0.509 | pred 179 gold 198
+m0  adapter paragraphing_asr k=60                 exact P 0.375 R 0.288 F1 0.326 | tol1 F1 0.474 | pred 152 gold 198
+m0  adapter paragraphing_asr k=80                 exact P 0.429 R 0.242 F1 0.310 | tol1 F1 0.387 | pred 112 gold 198
+m6  none                                          exact P 0.889 R 0.039 F1 0.074 | tol1 F1 0.074 | pred 9 gold 206
+m6  oracle                                        exact P 0.974 R 0.917 F1 0.945 | tol1 F1 0.965 | pred 194 gold 206
+m6  pauses n=0.3 m=0 sent_only=False              exact P 0.029 R 0.947 F1 0.057 | tol1 F1 0.059 | pred 6670 gold 206
+m6  pauses n=0.3 m=0 sent_only=True               exact P 0.108 R 0.888 F1 0.193 | tol1 F1 0.215 | pred 1691 gold 206
+m6  pauses n=0.3 m=20 sent_only=False             exact P 0.041 R 0.214 F1 0.069 | tol1 F1 0.300 | pred 1075 gold 206
+m6  pauses n=0.3 m=20 sent_only=True              exact P 0.138 R 0.495 F1 0.215 | tol1 F1 0.384 | pred 741 gold 206
+m6  pauses n=0.3 m=40 sent_only=False             exact P 0.072 R 0.175 F1 0.102 | tol1 F1 0.435 | pred 497 gold 206
+m6  pauses n=0.3 m=40 sent_only=True              exact P 0.167 R 0.316 F1 0.218 | tol1 F1 0.480 | pred 390 gold 206
+m6  pauses n=0.3 m=60 sent_only=False             exact P 0.052 R 0.078 F1 0.063 | tol1 F1 0.517 | pred 305 gold 206
+m6  pauses n=0.3 m=60 sent_only=True              exact P 0.149 R 0.175 F1 0.161 | tol1 F1 0.474 | pred 241 gold 206
+m6  pauses n=0.3 m=80 sent_only=False             exact P 0.104 R 0.102 F1 0.103 | tol1 F1 0.441 | pred 202 gold 206
+m6  pauses n=0.3 m=80 sent_only=True              exact P 0.185 R 0.155 F1 0.169 | tol1 F1 0.401 | pred 173 gold 206
+m6  pauses n=0.5 m=0 sent_only=False              exact P 0.033 R 0.913 F1 0.064 | tol1 F1 0.069 | pred 5666 gold 206
+m6  pauses n=0.5 m=0 sent_only=True               exact P 0.110 R 0.850 F1 0.195 | tol1 F1 0.228 | pred 1586 gold 206
+m6  pauses n=0.5 m=20 sent_only=False             exact P 0.039 R 0.199 F1 0.066 | tol1 F1 0.303 | pred 1040 gold 206
+m6  pauses n=0.5 m=20 sent_only=True              exact P 0.141 R 0.485 F1 0.219 | tol1 F1 0.396 | pred 708 gold 206
+m6  pauses n=0.5 m=40 sent_only=False             exact P 0.070 R 0.165 F1 0.098 | tol1 F1 0.446 | pred 489 gold 206
+m6  pauses n=0.5 m=40 sent_only=True              exact P 0.162 R 0.296 F1 0.209 | tol1 F1 0.491 | pred 377 gold 206
+m6  pauses n=0.5 m=60 sent_only=False             exact P 0.053 R 0.078 F1 0.063 | tol1 F1 0.510 | pred 300 gold 206
+m6  pauses n=0.5 m=60 sent_only=True              exact P 0.148 R 0.170 F1 0.158 | tol1 F1 0.466 | pred 236 gold 206
+m6  pauses n=0.5 m=80 sent_only=False             exact P 0.099 R 0.097 F1 0.098 | tol1 F1 0.445 | pred 203 gold 206
+m6  pauses n=0.5 m=80 sent_only=True              exact P 0.179 R 0.146 F1 0.160 | tol1 F1 0.406 | pred 168 gold 206
+m6  pauses n=0.7 m=0 sent_only=False              exact P 0.040 R 0.854 F1 0.077 | tol1 F1 0.089 | pred 4352 gold 206
+m6  pauses n=0.7 m=0 sent_only=True               exact P 0.119 R 0.806 F1 0.207 | tol1 F1 0.249 | pred 1394 gold 206
+m6  pauses n=0.7 m=20 sent_only=False             exact P 0.052 R 0.243 F1 0.086 | tol1 F1 0.322 | pred 962 gold 206
+m6  pauses n=0.7 m=20 sent_only=True              exact P 0.152 R 0.485 F1 0.231 | tol1 F1 0.404 | pred 660 gold 206
+m6  pauses n=0.7 m=40 sent_only=False             exact P 0.078 R 0.175 F1 0.107 | tol1 F1 0.463 | pred 464 gold 206
+m6  pauses n=0.7 m=40 sent_only=True              exact P 0.165 R 0.291 F1 0.211 | tol1 F1 0.484 | pred 364 gold 206
+m6  pauses n=0.7 m=60 sent_only=False             exact P 0.069 R 0.097 F1 0.081 | tol1 F1 0.481 | pred 289 gold 206
+m6  pauses n=0.7 m=60 sent_only=True              exact P 0.181 R 0.199 F1 0.190 | tol1 F1 0.477 | pred 226 gold 206
+m6  pauses n=0.7 m=80 sent_only=False             exact P 0.101 R 0.097 F1 0.099 | tol1 F1 0.426 | pred 198 gold 206
+m6  pauses n=0.7 m=80 sent_only=True              exact P 0.205 R 0.160 F1 0.180 | tol1 F1 0.436 | pred 161 gold 206
+m6  pauses n=1.0 m=0 sent_only=False              exact P 0.056 R 0.772 F1 0.105 | tol1 F1 0.132 | pred 2836 gold 206
+m6  pauses n=1.0 m=0 sent_only=True               exact P 0.134 R 0.723 F1 0.226 | tol1 F1 0.282 | pred 1114 gold 206
+m6  pauses n=1.0 m=20 sent_only=False             exact P 0.069 R 0.272 F1 0.110 | tol1 F1 0.343 | pred 815 gold 206
+m6  pauses n=1.0 m=20 sent_only=True              exact P 0.160 R 0.447 F1 0.236 | tol1 F1 0.415 | pred 574 gold 206
+m6  pauses n=1.0 m=40 sent_only=False             exact P 0.089 R 0.180 F1 0.119 | tol1 F1 0.456 | pred 417 gold 206
+m6  pauses n=1.0 m=40 sent_only=True              exact P 0.191 R 0.306 F1 0.236 | tol1 F1 0.475 | pred 329 gold 206
+m6  pauses n=1.0 m=60 sent_only=False             exact P 0.089 R 0.117 F1 0.101 | tol1 F1 0.471 | pred 270 gold 206
+m6  pauses n=1.0 m=60 sent_only=True              exact P 0.194 R 0.199 F1 0.197 | tol1 F1 0.460 | pred 211 gold 206
+m6  pauses n=1.0 m=80 sent_only=False             exact P 0.130 R 0.117 F1 0.123 | tol1 F1 0.404 | pred 185 gold 206
+m6  pauses n=1.0 m=80 sent_only=True              exact P 0.230 R 0.170 F1 0.196 | tol1 F1 0.447 | pred 152 gold 206
+m6  pauses n=1.5 m=0 sent_only=False              exact P 0.082 R 0.607 F1 0.144 | tol1 F1 0.212 | pred 1530 gold 206
+m6  pauses n=1.5 m=0 sent_only=True               exact P 0.158 R 0.553 F1 0.245 | tol1 F1 0.340 | pred 723 gold 206
+m6  pauses n=1.5 m=20 sent_only=False             exact P 0.098 R 0.296 F1 0.147 | tol1 F1 0.378 | pred 625 gold 206
+m6  pauses n=1.5 m=20 sent_only=True              exact P 0.178 R 0.369 F1 0.241 | tol1 F1 0.418 | pred 426 gold 206
+m6  pauses n=1.5 m=40 sent_only=False             exact P 0.136 R 0.228 F1 0.171 | tol1 F1 0.475 | pred 345 gold 206
+m6  pauses n=1.5 m=40 sent_only=True              exact P 0.220 R 0.277 F1 0.245 | tol1 F1 0.452 | pred 259 gold 206
+m6  pauses n=1.5 m=60 sent_only=False             exact P 0.110 R 0.126 F1 0.118 | tol1 F1 0.434 | pred 236 gold 206
+m6  pauses n=1.5 m=60 sent_only=True              exact P 0.213 R 0.180 F1 0.195 | tol1 F1 0.421 | pred 174 gold 206
+m6  pauses n=1.5 m=80 sent_only=False             exact P 0.169 R 0.131 F1 0.148 | tol1 F1 0.437 | pred 160 gold 206
+m6  pauses n=1.5 m=80 sent_only=True              exact P 0.281 R 0.184 F1 0.223 | tol1 F1 0.405 | pred 135 gold 206
+m6  pauses n=2.0 m=0 sent_only=False              exact P 0.116 R 0.485 F1 0.187 | tol1 F1 0.292 | pred 862 gold 206
+m6  pauses n=2.0 m=0 sent_only=True               exact P 0.197 R 0.447 F1 0.273 | tol1 F1 0.374 | pred 468 gold 206
+m6  pauses n=2.0 m=20 sent_only=False             exact P 0.145 R 0.306 F1 0.197 | tol1 F1 0.424 | pred 435 gold 206
+m6  pauses n=2.0 m=20 sent_only=True              exact P 0.232 R 0.330 F1 0.273 | tol1 F1 0.437 | pred 293 gold 206
+m6  pauses n=2.0 m=40 sent_only=False             exact P 0.172 R 0.228 F1 0.196 | tol1 F1 0.493 | pred 273 gold 206
+m6  pauses n=2.0 m=40 sent_only=True              exact P 0.255 R 0.248 F1 0.251 | tol1 F1 0.433 | pred 200 gold 206
+m6  pauses n=2.0 m=60 sent_only=False             exact P 0.165 R 0.155 F1 0.160 | tol1 F1 0.435 | pred 194 gold 206
+m6  pauses n=2.0 m=60 sent_only=True              exact P 0.252 R 0.175 F1 0.206 | tol1 F1 0.395 | pred 143 gold 206
+m6  pauses n=2.0 m=80 sent_only=False             exact P 0.241 R 0.165 F1 0.196 | tol1 F1 0.450 | pred 141 gold 206
+m6  pauses n=2.0 m=80 sent_only=True              exact P 0.342 R 0.184 F1 0.240 | tol1 F1 0.360 | pred 111 gold 206
+m6  pauses n=2.5 m=0 sent_only=False              exact P 0.141 R 0.359 F1 0.202 | tol1 F1 0.337 | pred 525 gold 206
+m6  pauses n=2.5 m=0 sent_only=True               exact P 0.223 R 0.340 F1 0.269 | tol1 F1 0.396 | pred 314 gold 206
+m6  pauses n=2.5 m=20 sent_only=False             exact P 0.159 R 0.243 F1 0.192 | tol1 F1 0.422 | pred 315 gold 206
+m6  pauses n=2.5 m=20 sent_only=True              exact P 0.242 R 0.257 F1 0.249 | tol1 F1 0.438 | pred 219 gold 206
+m6  pauses n=2.5 m=40 sent_only=False             exact P 0.213 R 0.214 F1 0.213 | tol1 F1 0.470 | pred 207 gold 206
+m6  pauses n=2.5 m=40 sent_only=True              exact P 0.281 R 0.209 F1 0.240 | tol1 F1 0.412 | pred 153 gold 206
+m6  pauses n=2.5 m=60 sent_only=False             exact P 0.203 R 0.146 F1 0.169 | tol1 F1 0.412 | pred 148 gold 206
+m6  pauses n=2.5 m=60 sent_only=True              exact P 0.299 R 0.170 F1 0.217 | tol1 F1 0.390 | pred 117 gold 206
+m6  pauses n=2.5 m=80 sent_only=False             exact P 0.270 R 0.146 F1 0.189 | tol1 F1 0.410 | pred 111 gold 206
+m6  pauses n=2.5 m=80 sent_only=True              exact P 0.360 R 0.155 F1 0.217 | tol1 F1 0.346 | pred 89 gold 206
+m6  pauses n=3.0 m=0 sent_only=False              exact P 0.181 R 0.262 F1 0.214 | tol1 F1 0.337 | pred 299 gold 206
+m6  pauses n=3.0 m=0 sent_only=True               exact P 0.267 R 0.243 F1 0.254 | tol1 F1 0.351 | pred 187 gold 206
+m6  pauses n=3.0 m=20 sent_only=False             exact P 0.230 R 0.218 F1 0.224 | tol1 F1 0.393 | pred 196 gold 206
+m6  pauses n=3.0 m=20 sent_only=True              exact P 0.313 R 0.204 F1 0.247 | tol1 F1 0.365 | pred 134 gold 206
+m6  pauses n=3.0 m=40 sent_only=False             exact P 0.254 R 0.175 F1 0.207 | tol1 F1 0.408 | pred 142 gold 206
+m6  pauses n=3.0 m=40 sent_only=True              exact P 0.330 R 0.165 F1 0.220 | tol1 F1 0.343 | pred 103 gold 206
+m6  pauses n=3.0 m=60 sent_only=False             exact P 0.295 R 0.150 F1 0.199 | tol1 F1 0.373 | pred 105 gold 206
+m6  pauses n=3.0 m=60 sent_only=True              exact P 0.362 R 0.141 F1 0.203 | tol1 F1 0.308 | pred 80 gold 206
+m6  pauses n=3.0 m=80 sent_only=False             exact P 0.384 R 0.160 F1 0.226 | tol1 F1 0.363 | pred 86 gold 206
+m6  pauses n=3.0 m=80 sent_only=True              exact P 0.426 R 0.141 F1 0.212 | tol1 F1 0.299 | pred 68 gold 206
+m6  pauses n=4.0 m=0 sent_only=False              exact P 0.297 R 0.170 F1 0.216 | tol1 F1 0.296 | pred 118 gold 206
+m6  pauses n=4.0 m=0 sent_only=True               exact P 0.385 R 0.146 F1 0.211 | tol1 F1 0.261 | pred 78 gold 206
+m6  pauses n=4.0 m=20 sent_only=False             exact P 0.361 R 0.146 F1 0.208 | tol1 F1 0.304 | pred 83 gold 206
+m6  pauses n=4.0 m=20 sent_only=True              exact P 0.441 R 0.126 F1 0.196 | tol1 F1 0.249 | pred 59 gold 206
+m6  pauses n=4.0 m=40 sent_only=False             exact P 0.433 R 0.126 F1 0.195 | tol1 F1 0.301 | pred 60 gold 206
+m6  pauses n=4.0 m=40 sent_only=True              exact P 0.500 R 0.107 F1 0.176 | tol1 F1 0.224 | pred 44 gold 206
+m6  pauses n=4.0 m=60 sent_only=False             exact P 0.460 R 0.112 F1 0.180 | tol1 F1 0.273 | pred 50 gold 206
+m6  pauses n=4.0 m=60 sent_only=True              exact P 0.514 R 0.092 F1 0.156 | tol1 F1 0.206 | pred 37 gold 206
+m6  pauses n=4.0 m=80 sent_only=False             exact P 0.511 R 0.112 F1 0.183 | tol1 F1 0.255 | pred 45 gold 206
+m6  pauses n=4.0 m=80 sent_only=True              exact P 0.528 R 0.092 F1 0.157 | tol1 F1 0.198 | pred 36 gold 206
+m6  texttiling w=2 c=0.0 k=0                      exact P 0.147 R 0.456 F1 0.222 | tol1 F1 0.355 | pred 639 gold 206
+m6  texttiling w=2 c=0.0 k=20                     exact P 0.172 R 0.379 F1 0.237 | tol1 F1 0.413 | pred 453 gold 206
+m6  texttiling w=2 c=0.0 k=40                     exact P 0.180 R 0.277 F1 0.218 | tol1 F1 0.406 | pred 316 gold 206
+m6  texttiling w=2 c=0.0 k=60                     exact P 0.173 R 0.214 F1 0.191 | tol1 F1 0.357 | pred 254 gold 206
+m6  texttiling w=2 c=0.5 k=0                      exact P 0.161 R 0.320 F1 0.215 | tol1 F1 0.351 | pred 409 gold 206
+m6  texttiling w=2 c=0.5 k=20                     exact P 0.164 R 0.267 F1 0.203 | tol1 F1 0.377 | pred 335 gold 206
+m6  texttiling w=2 c=0.5 k=40                     exact P 0.170 R 0.209 F1 0.187 | tol1 F1 0.357 | pred 253 gold 206
+m6  texttiling w=2 c=0.5 k=60                     exact P 0.167 R 0.170 F1 0.169 | tol1 F1 0.313 | pred 209 gold 206
+m6  texttiling w=2 c=1.0 k=0                      exact P 0.189 R 0.223 F1 0.204 | tol1 F1 0.311 | pred 244 gold 206
+m6  texttiling w=2 c=1.0 k=20                     exact P 0.193 R 0.199 F1 0.196 | tol1 F1 0.325 | pred 212 gold 206
+m6  texttiling w=2 c=1.0 k=40                     exact P 0.188 R 0.160 F1 0.173 | tol1 F1 0.309 | pred 176 gold 206
+m6  texttiling w=2 c=1.0 k=60                     exact P 0.183 R 0.146 F1 0.162 | tol1 F1 0.286 | pred 164 gold 206
+m6  texttiling w=2 c=1.5 k=0                      exact P 0.183 R 0.126 F1 0.149 | tol1 F1 0.264 | pred 142 gold 206
+m6  texttiling w=2 c=1.5 k=20                     exact P 0.186 R 0.117 F1 0.143 | tol1 F1 0.269 | pred 129 gold 206
+m6  texttiling w=2 c=1.5 k=40                     exact P 0.182 R 0.097 F1 0.127 | tol1 F1 0.253 | pred 110 gold 206
+m6  texttiling w=2 c=1.5 k=60                     exact P 0.181 R 0.092 F1 0.122 | tol1 F1 0.238 | pred 105 gold 206
+m6  texttiling w=3 c=0.0 k=0                      exact P 0.138 R 0.417 F1 0.208 | tol1 F1 0.341 | pred 622 gold 206
+m6  texttiling w=3 c=0.0 k=20                     exact P 0.172 R 0.364 F1 0.234 | tol1 F1 0.402 | pred 435 gold 206
+m6  texttiling w=3 c=0.0 k=40                     exact P 0.175 R 0.257 F1 0.209 | tol1 F1 0.370 | pred 302 gold 206
+m6  texttiling w=3 c=0.0 k=60                     exact P 0.169 R 0.204 F1 0.185 | tol1 F1 0.321 | pred 249 gold 206
+m6  texttiling w=3 c=0.5 k=0                      exact P 0.164 R 0.301 F1 0.212 | tol1 F1 0.353 | pred 378 gold 206
+m6  texttiling w=3 c=0.5 k=20                     exact P 0.174 R 0.262 F1 0.209 | tol1 F1 0.360 | pred 311 gold 206
+m6  texttiling w=3 c=0.5 k=40                     exact P 0.189 R 0.218 F1 0.203 | tol1 F1 0.333 | pred 238 gold 206
+m6  texttiling w=3 c=0.5 k=60                     exact P 0.181 R 0.180 F1 0.180 | tol1 F1 0.283 | pred 204 gold 206
+m6  texttiling w=3 c=1.0 k=0                      exact P 0.191 R 0.199 F1 0.195 | tol1 F1 0.295 | pred 215 gold 206
+m6  texttiling w=3 c=1.0 k=20                     exact P 0.199 R 0.189 F1 0.194 | tol1 F1 0.279 | pred 196 gold 206
+m6  texttiling w=3 c=1.0 k=40                     exact P 0.212 R 0.175 F1 0.191 | tol1 F1 0.271 | pred 170 gold 206
+m6  texttiling w=3 c=1.0 k=60                     exact P 0.196 R 0.146 F1 0.167 | tol1 F1 0.234 | pred 153 gold 206
+m6  texttiling w=3 c=1.5 k=0                      exact P 0.207 R 0.136 F1 0.164 | tol1 F1 0.229 | pred 135 gold 206
+m6  texttiling w=3 c=1.5 k=20                     exact P 0.205 R 0.131 F1 0.160 | tol1 F1 0.225 | pred 132 gold 206
+m6  texttiling w=3 c=1.5 k=40                     exact P 0.215 R 0.126 F1 0.159 | tol1 F1 0.214 | pred 121 gold 206
+m6  texttiling w=3 c=1.5 k=60                     exact P 0.214 R 0.117 F1 0.151 | tol1 F1 0.195 | pred 112 gold 206
+m6  texttiling w=4 c=0.0 k=0                      exact P 0.139 R 0.422 F1 0.209 | tol1 F1 0.346 | pred 627 gold 206
+m6  texttiling w=4 c=0.0 k=20                     exact P 0.177 R 0.354 F1 0.236 | tol1 F1 0.398 | pred 412 gold 206
+m6  texttiling w=4 c=0.0 k=40                     exact P 0.205 R 0.301 F1 0.244 | tol1 F1 0.385 | pred 303 gold 206
+m6  texttiling w=4 c=0.0 k=60                     exact P 0.226 R 0.262 F1 0.243 | tol1 F1 0.364 | pred 239 gold 206
+m6  texttiling w=4 c=0.5 k=0                      exact P 0.185 R 0.330 F1 0.237 | tol1 F1 0.335 | pred 367 gold 206
+m6  texttiling w=4 c=0.5 k=20                     exact P 0.224 R 0.306 F1 0.259 | tol1 F1 0.361 | pred 281 gold 206
+m6  texttiling w=4 c=0.5 k=40                     exact P 0.244 R 0.282 F1 0.261 | tol1 F1 0.356 | pred 238 gold 206
+m6  texttiling w=4 c=0.5 k=60                     exact P 0.262 R 0.248 F1 0.254 | tol1 F1 0.329 | pred 195 gold 206
+m6  texttiling w=4 c=1.0 k=0                      exact P 0.190 R 0.214 F1 0.201 | tol1 F1 0.279 | pred 231 gold 206
+m6  texttiling w=4 c=1.0 k=20                     exact P 0.212 R 0.209 F1 0.210 | tol1 F1 0.293 | pred 203 gold 206
+m6  texttiling w=4 c=1.0 k=40                     exact P 0.229 R 0.199 F1 0.213 | tol1 F1 0.291 | pred 179 gold 206
+m6  texttiling w=4 c=1.0 k=60                     exact P 0.256 R 0.194 F1 0.221 | tol1 F1 0.276 | pred 156 gold 206
+m6  texttiling w=4 c=1.5 k=0                      exact P 0.279 R 0.175 F1 0.215 | tol1 F1 0.257 | pred 129 gold 206
+m6  texttiling w=4 c=1.5 k=20                     exact P 0.282 R 0.170 F1 0.212 | tol1 F1 0.261 | pred 124 gold 206
+m6  texttiling w=4 c=1.5 k=40                     exact P 0.284 R 0.160 F1 0.205 | tol1 F1 0.248 | pred 116 gold 206
+m6  texttiling w=4 c=1.5 k=60                     exact P 0.294 R 0.155 F1 0.203 | tol1 F1 0.241 | pred 109 gold 206
+m6  texttiling w=6 c=0.0 k=0                      exact P 0.131 R 0.393 F1 0.197 | tol1 F1 0.308 | pred 618 gold 206
+m6  texttiling w=6 c=0.0 k=20                     exact P 0.154 R 0.277 F1 0.198 | tol1 F1 0.364 | pred 371 gold 206
+m6  texttiling w=6 c=0.0 k=40                     exact P 0.172 R 0.223 F1 0.194 | tol1 F1 0.367 | pred 268 gold 206
+m6  texttiling w=6 c=0.0 k=60                     exact P 0.151 R 0.160 F1 0.155 | tol1 F1 0.329 | pred 219 gold 206
+m6  texttiling w=6 c=0.5 k=0                      exact P 0.161 R 0.272 F1 0.203 | tol1 F1 0.300 | pred 347 gold 206
+m6  texttiling w=6 c=0.5 k=20                     exact P 0.164 R 0.194 F1 0.178 | tol1 F1 0.316 | pred 244 gold 206
+m6  texttiling w=6 c=0.5 k=40                     exact P 0.168 R 0.160 F1 0.164 | tol1 F1 0.303 | pred 197 gold 206
+m6  texttiling w=6 c=0.5 k=60                     exact P 0.154 R 0.131 F1 0.142 | tol1 F1 0.283 | pred 175 gold 206
+m6  texttiling w=6 c=1.0 k=0                      exact P 0.179 R 0.170 F1 0.174 | tol1 F1 0.264 | pred 196 gold 206
+m6  texttiling w=6 c=1.0 k=20                     exact P 0.182 R 0.150 F1 0.165 | tol1 F1 0.261 | pred 170 gold 206
+m6  texttiling w=6 c=1.0 k=40                     exact P 0.189 R 0.136 F1 0.158 | tol1 F1 0.254 | pred 148 gold 206
+m6  texttiling w=6 c=1.0 k=60                     exact P 0.168 R 0.112 F1 0.134 | tol1 F1 0.239 | pred 137 gold 206
+m6  texttiling w=6 c=1.5 k=0                      exact P 0.197 R 0.121 F1 0.150 | tol1 F1 0.240 | pred 127 gold 206
+m6  texttiling w=6 c=1.5 k=20                     exact P 0.208 R 0.121 F1 0.153 | tol1 F1 0.239 | pred 120 gold 206
+m6  texttiling w=6 c=1.5 k=40                     exact P 0.214 R 0.117 F1 0.151 | tol1 F1 0.239 | pred 112 gold 206
+m6  texttiling w=6 c=1.5 k=60                     exact P 0.200 R 0.102 F1 0.135 | tol1 F1 0.232 | pred 105 gold 206
+m6  adapter paragraphing k=0                      exact P 0.284 R 0.456 F1 0.350 | tol1 F1 0.503 | pred 331 gold 206
+m6  adapter paragraphing k=10                     exact P 0.291 R 0.437 F1 0.350 | tol1 F1 0.509 | pred 309 gold 206
+m6  adapter paragraphing k=20                     exact P 0.304 R 0.432 F1 0.357 | tol1 F1 0.517 | pred 293 gold 206
+m6  adapter paragraphing k=30                     exact P 0.324 R 0.413 F1 0.363 | tol1 F1 0.513 | pred 262 gold 206
+m6  adapter paragraphing k=40                     exact P 0.332 R 0.354 F1 0.343 | tol1 F1 0.479 | pred 220 gold 206
+m6  adapter paragraphing k=50                     exact P 0.332 R 0.306 F1 0.318 | tol1 F1 0.455 | pred 190 gold 206
+m6  adapter paragraphing k=60                     exact P 0.353 R 0.286 F1 0.316 | tol1 F1 0.461 | pred 167 gold 206
+m6  adapter paragraphing k=80                     exact P 0.410 R 0.233 F1 0.297 | tol1 F1 0.415 | pred 117 gold 206
+m6  adapter paragraphing_asr k=0                  exact P 0.240 R 0.524 F1 0.329 | tol1 F1 0.448 | pred 450 gold 206
+m6  adapter paragraphing_asr k=10                 exact P 0.277 R 0.490 F1 0.354 | tol1 F1 0.504 | pred 365 gold 206
+m6  adapter paragraphing_asr k=20                 exact P 0.315 R 0.466 F1 0.376 | tol1 F1 0.544 | pred 305 gold 206
+m6  adapter paragraphing_asr k=30                 exact P 0.315 R 0.413 F1 0.357 | tol1 F1 0.550 | pred 270 gold 206
+m6  adapter paragraphing_asr k=40                 exact P 0.350 R 0.374 F1 0.362 | tol1 F1 0.526 | pred 220 gold 206
+m6  adapter paragraphing_asr k=50                 exact P 0.357 R 0.316 F1 0.335 | tol1 F1 0.485 | pred 182 gold 206
+m6  adapter paragraphing_asr k=60                 exact P 0.360 R 0.282 F1 0.316 | tol1 F1 0.463 | pred 161 gold 206
+m6  adapter paragraphing_asr k=80                 exact P 0.392 R 0.228 F1 0.288 | tol1 F1 0.399 | pred 120 gold 206
+mo  none                                          exact P 0.000 R 0.000 F1 0.000 | tol1 F1 0.000 | pred 0 gold 383
+mo  oracle                                        exact P 0.974 R 0.890 F1 0.930 | tol1 F1 0.941 | pred 350 gold 383
+mo  pauses n=0.3 m=0 sent_only=False              exact P 0.039 R 0.953 F1 0.075 | tol1 F1 0.075 | pred 9403 gold 383
+mo  pauses n=0.3 m=0 sent_only=True               exact P 0.152 R 0.877 F1 0.258 | tol1 F1 0.284 | pred 2217 gold 383
+mo  pauses n=0.3 m=20 sent_only=False             exact P 0.062 R 0.235 F1 0.098 | tol1 F1 0.381 | pred 1463 gold 383
+mo  pauses n=0.3 m=20 sent_only=True              exact P 0.193 R 0.501 F1 0.279 | tol1 F1 0.485 | pred 993 gold 383
+mo  pauses n=0.3 m=40 sent_only=False             exact P 0.075 R 0.138 F1 0.098 | tol1 F1 0.547 | pred 703 gold 383
+mo  pauses n=0.3 m=40 sent_only=True              exact P 0.221 R 0.319 F1 0.261 | tol1 F1 0.569 | pred 552 gold 383
+mo  pauses n=0.3 m=60 sent_only=False             exact P 0.081 R 0.094 F1 0.087 | tol1 F1 0.593 | pred 444 gold 383
+mo  pauses n=0.3 m=60 sent_only=True              exact P 0.203 R 0.193 F1 0.198 | tol1 F1 0.530 | pred 364 gold 383
+mo  pauses n=0.3 m=80 sent_only=False             exact P 0.091 R 0.073 F1 0.081 | tol1 F1 0.503 | pred 309 gold 383
+mo  pauses n=0.3 m=80 sent_only=True              exact P 0.246 R 0.170 F1 0.201 | tol1 F1 0.448 | pred 264 gold 383
+mo  pauses n=0.5 m=0 sent_only=False              exact P 0.045 R 0.924 F1 0.086 | tol1 F1 0.090 | pred 7857 gold 383
+mo  pauses n=0.5 m=0 sent_only=True               exact P 0.154 R 0.846 F1 0.261 | tol1 F1 0.297 | pred 2100 gold 383
+mo  pauses n=0.5 m=20 sent_only=False             exact P 0.059 R 0.219 F1 0.093 | tol1 F1 0.386 | pred 1416 gold 383
+mo  pauses n=0.5 m=20 sent_only=True              exact P 0.194 R 0.488 F1 0.278 | tol1 F1 0.491 | pred 962 gold 383
+mo  pauses n=0.5 m=40 sent_only=False             exact P 0.089 R 0.162 F1 0.115 | tol1 F1 0.547 | pred 695 gold 383
+mo  pauses n=0.5 m=40 sent_only=True              exact P 0.215 R 0.303 F1 0.251 | tol1 F1 0.574 | pred 540 gold 383
+mo  pauses n=0.5 m=60 sent_only=False             exact P 0.086 R 0.099 F1 0.092 | tol1 F1 0.586 | pred 440 gold 383
+mo  pauses n=0.5 m=60 sent_only=True              exact P 0.207 R 0.193 F1 0.200 | tol1 F1 0.529 | pred 358 gold 383
+mo  pauses n=0.5 m=80 sent_only=False             exact P 0.092 R 0.073 F1 0.081 | tol1 F1 0.511 | pred 306 gold 383
+mo  pauses n=0.5 m=80 sent_only=True              exact P 0.235 R 0.159 F1 0.190 | tol1 F1 0.448 | pred 260 gold 383
+mo  pauses n=0.7 m=0 sent_only=False              exact P 0.056 R 0.885 F1 0.106 | tol1 F1 0.115 | pred 6026 gold 383
+mo  pauses n=0.7 m=0 sent_only=True               exact P 0.165 R 0.817 F1 0.275 | tol1 F1 0.319 | pred 1896 gold 383
+mo  pauses n=0.7 m=20 sent_only=False             exact P 0.086 R 0.298 F1 0.133 | tol1 F1 0.404 | pred 1333 gold 383
+mo  pauses n=0.7 m=20 sent_only=True              exact P 0.205 R 0.483 F1 0.288 | tol1 F1 0.499 | pred 903 gold 383
+mo  pauses n=0.7 m=40 sent_only=False             exact P 0.093 R 0.162 F1 0.118 | tol1 F1 0.550 | pred 668 gold 383
+mo  pauses n=0.7 m=40 sent_only=True              exact P 0.232 R 0.316 F1 0.267 | tol1 F1 0.568 | pred 522 gold 383
+mo  pauses n=0.7 m=60 sent_only=False             exact P 0.118 R 0.131 F1 0.124 | tol1 F1 0.574 | pred 425 gold 383
+mo  pauses n=0.7 m=60 sent_only=True              exact P 0.230 R 0.209 F1 0.219 | tol1 F1 0.539 | pred 348 gold 383
+mo  pauses n=0.7 m=80 sent_only=False             exact P 0.110 R 0.086 F1 0.097 | tol1 F1 0.501 | pred 300 gold 383
+mo  pauses n=0.7 m=80 sent_only=True              exact P 0.258 R 0.172 F1 0.207 | tol1 F1 0.454 | pred 256 gold 383
+mo  pauses n=1.0 m=0 sent_only=False              exact P 0.083 R 0.833 F1 0.151 | tol1 F1 0.174 | pred 3831 gold 383
+mo  pauses n=1.0 m=0 sent_only=True               exact P 0.189 R 0.765 F1 0.303 | tol1 F1 0.361 | pred 1548 gold 383
+mo  pauses n=1.0 m=20 sent_only=False             exact P 0.108 R 0.324 F1 0.162 | tol1 F1 0.435 | pred 1144 gold 383
+mo  pauses n=1.0 m=20 sent_only=True              exact P 0.229 R 0.480 F1 0.310 | tol1 F1 0.518 | pred 803 gold 383
+mo  pauses n=1.0 m=40 sent_only=False             exact P 0.137 R 0.217 F1 0.168 | tol1 F1 0.549 | pred 605 gold 383
+mo  pauses n=1.0 m=40 sent_only=True              exact P 0.276 R 0.350 F1 0.309 | tol1 F1 0.558 | pred 485 gold 383
+mo  pauses n=1.0 m=60 sent_only=False             exact P 0.124 R 0.128 F1 0.126 | tol1 F1 0.545 | pred 395 gold 383
+mo  pauses n=1.0 m=60 sent_only=True              exact P 0.248 R 0.214 F1 0.230 | tol1 F1 0.529 | pred 331 gold 383
+mo  pauses n=1.0 m=80 sent_only=False             exact P 0.153 R 0.115 F1 0.131 | tol1 F1 0.468 | pred 288 gold 383
+mo  pauses n=1.0 m=80 sent_only=True              exact P 0.286 R 0.183 F1 0.223 | tol1 F1 0.436 | pred 245 gold 383
+mo  pauses n=1.5 m=0 sent_only=False              exact P 0.143 R 0.708 F1 0.238 | tol1 F1 0.298 | pred 1896 gold 383
+mo  pauses n=1.5 m=0 sent_only=True               exact P 0.253 R 0.645 F1 0.363 | tol1 F1 0.451 | pred 977 gold 383
+mo  pauses n=1.5 m=20 sent_only=False             exact P 0.200 R 0.441 F1 0.275 | tol1 F1 0.486 | pred 844 gold 383
+mo  pauses n=1.5 m=20 sent_only=True              exact P 0.307 R 0.478 F1 0.374 | tol1 F1 0.531 | pred 596 gold 383
+mo  pauses n=1.5 m=40 sent_only=False             exact P 0.244 R 0.319 F1 0.276 | tol1 F1 0.566 | pred 500 gold 383
+mo  pauses n=1.5 m=40 sent_only=True              exact P 0.372 R 0.381 F1 0.376 | tol1 F1 0.554 | pred 393 gold 383
+mo  pauses n=1.5 m=60 sent_only=False             exact P 0.231 R 0.206 F1 0.218 | tol1 F1 0.532 | pred 342 gold 383
+mo  pauses n=1.5 m=60 sent_only=True              exact P 0.348 R 0.251 F1 0.291 | tol1 F1 0.519 | pred 276 gold 383
+mo  pauses n=1.5 m=80 sent_only=False             exact P 0.278 R 0.183 F1 0.220 | tol1 F1 0.476 | pred 252 gold 383
+mo  pauses n=1.5 m=80 sent_only=True              exact P 0.389 R 0.225 F1 0.285 | tol1 F1 0.424 | pred 221 gold 383
+mo  pauses n=2.0 m=0 sent_only=False              exact P 0.190 R 0.501 F1 0.276 | tol1 F1 0.376 | pred 1009 gold 383
+mo  pauses n=2.0 m=0 sent_only=True               exact P 0.302 R 0.465 F1 0.366 | tol1 F1 0.459 | pred 589 gold 383
+mo  pauses n=2.0 m=20 sent_only=False             exact P 0.258 R 0.366 F1 0.302 | tol1 F1 0.495 | pred 543 gold 383
+mo  pauses n=2.0 m=20 sent_only=True              exact P 0.364 R 0.366 F1 0.365 | tol1 F1 0.505 | pred 385 gold 383
+mo  pauses n=2.0 m=40 sent_only=False             exact P 0.308 R 0.292 F1 0.300 | tol1 F1 0.533 | pred 364 gold 383
+mo  pauses n=2.0 m=40 sent_only=True              exact P 0.415 R 0.305 F1 0.352 | tol1 F1 0.493 | pred 282 gold 383
+mo  pauses n=2.0 m=60 sent_only=False             exact P 0.304 R 0.206 F1 0.246 | tol1 F1 0.470 | pred 260 gold 383
+mo  pauses n=2.0 m=60 sent_only=True              exact P 0.404 R 0.219 F1 0.284 | tol1 F1 0.437 | pred 208 gold 383
+mo  pauses n=2.0 m=80 sent_only=False             exact P 0.348 R 0.188 F1 0.244 | tol1 F1 0.434 | pred 207 gold 383
+mo  pauses n=2.0 m=80 sent_only=True              exact P 0.465 R 0.209 F1 0.288 | tol1 F1 0.393 | pred 172 gold 383
+mo  pauses n=2.5 m=0 sent_only=False              exact P 0.201 R 0.308 F1 0.243 | tol1 F1 0.365 | pred 588 gold 383
+mo  pauses n=2.5 m=0 sent_only=True               exact P 0.311 R 0.298 F1 0.304 | tol1 F1 0.403 | pred 367 gold 383
+mo  pauses n=2.5 m=20 sent_only=False             exact P 0.241 R 0.227 F1 0.234 | tol1 F1 0.419 | pred 361 gold 383
+mo  pauses n=2.5 m=20 sent_only=True              exact P 0.345 R 0.232 F1 0.278 | tol1 F1 0.418 | pred 258 gold 383
+mo  pauses n=2.5 m=40 sent_only=False             exact P 0.295 R 0.196 F1 0.235 | tol1 F1 0.433 | pred 254 gold 383
+mo  pauses n=2.5 m=40 sent_only=True              exact P 0.393 R 0.201 F1 0.266 | tol1 F1 0.390 | pred 196 gold 383
+mo  pauses n=2.5 m=60 sent_only=False             exact P 0.289 R 0.136 F1 0.185 | tol1 F1 0.366 | pred 180 gold 383
+mo  pauses n=2.5 m=60 sent_only=True              exact P 0.380 R 0.149 F1 0.214 | tol1 F1 0.345 | pred 150 gold 383
+mo  pauses n=2.5 m=80 sent_only=False             exact P 0.331 R 0.125 F1 0.182 | tol1 F1 0.345 | pred 145 gold 383
+mo  pauses n=2.5 m=80 sent_only=True              exact P 0.430 R 0.136 F1 0.206 | tol1 F1 0.310 | pred 121 gold 383
+mo  pauses n=3.0 m=0 sent_only=False              exact P 0.249 R 0.225 F1 0.236 | tol1 F1 0.337 | pred 346 gold 383
+mo  pauses n=3.0 m=0 sent_only=True               exact P 0.361 R 0.214 F1 0.269 | tol1 F1 0.341 | pred 227 gold 383
+mo  pauses n=3.0 m=20 sent_only=False             exact P 0.306 R 0.188 F1 0.233 | tol1 F1 0.366 | pred 235 gold 383
+mo  pauses n=3.0 m=20 sent_only=True              exact P 0.406 R 0.180 F1 0.250 | tol1 F1 0.336 | pred 170 gold 383
+mo  pauses n=3.0 m=40 sent_only=False             exact P 0.344 R 0.162 F1 0.220 | tol1 F1 0.369 | pred 180 gold 383
+mo  pauses n=3.0 m=40 sent_only=True              exact P 0.438 R 0.157 F1 0.231 | tol1 F1 0.319 | pred 137 gold 383
+mo  pauses n=3.0 m=60 sent_only=False             exact P 0.380 R 0.128 F1 0.191 | tol1 F1 0.316 | pred 129 gold 383
+mo  pauses n=3.0 m=60 sent_only=True              exact P 0.443 R 0.123 F1 0.192 | tol1 F1 0.270 | pred 106 gold 383
+mo  pauses n=3.0 m=80 sent_only=False             exact P 0.450 R 0.128 F1 0.199 | tol1 F1 0.297 | pred 109 gold 383
+mo  pauses n=3.0 m=80 sent_only=True              exact P 0.522 R 0.125 F1 0.202 | tol1 F1 0.261 | pred 92 gold 383
+mo  pauses n=4.0 m=0 sent_only=False              exact P 0.374 R 0.144 F1 0.208 | tol1 F1 0.268 | pred 147 gold 383
+mo  pauses n=4.0 m=0 sent_only=True               exact P 0.490 R 0.131 F1 0.206 | tol1 F1 0.243 | pred 102 gold 383
+mo  pauses n=4.0 m=20 sent_only=False             exact P 0.439 R 0.123 F1 0.192 | tol1 F1 0.265 | pred 107 gold 383
+mo  pauses n=4.0 m=20 sent_only=True              exact P 0.531 R 0.112 F1 0.185 | tol1 F1 0.228 | pred 81 gold 383
+mo  pauses n=4.0 m=40 sent_only=False             exact P 0.506 R 0.110 F1 0.180 | tol1 F1 0.253 | pred 83 gold 383
+mo  pauses n=4.0 m=40 sent_only=True              exact P 0.576 R 0.099 F1 0.169 | tol1 F1 0.209 | pred 66 gold 383
+mo  pauses n=4.0 m=60 sent_only=False             exact P 0.561 R 0.097 F1 0.165 | tol1 F1 0.227 | pred 66 gold 383
+mo  pauses n=4.0 m=60 sent_only=True              exact P 0.600 R 0.086 F1 0.151 | tol1 F1 0.187 | pred 55 gold 383
+mo  pauses n=4.0 m=80 sent_only=False             exact P 0.569 R 0.086 F1 0.150 | tol1 F1 0.200 | pred 58 gold 383
+mo  pauses n=4.0 m=80 sent_only=True              exact P 0.600 R 0.078 F1 0.139 | tol1 F1 0.166 | pred 50 gold 383
+mo  texttiling w=2 c=0.0 k=0                      exact P 0.213 R 0.480 F1 0.296 | tol1 F1 0.450 | pred 862 gold 383
+mo  texttiling w=2 c=0.0 k=20                     exact P 0.253 R 0.410 F1 0.313 | tol1 F1 0.494 | pred 621 gold 383
+mo  texttiling w=2 c=0.0 k=40                     exact P 0.276 R 0.321 F1 0.297 | tol1 F1 0.490 | pred 445 gold 383
+mo  texttiling w=2 c=0.0 k=60                     exact P 0.291 R 0.266 F1 0.278 | tol1 F1 0.439 | pred 351 gold 383
+mo  texttiling w=2 c=0.5 k=0                      exact P 0.231 R 0.358 F1 0.281 | tol1 F1 0.435 | pred 592 gold 383
+mo  texttiling w=2 c=0.5 k=20                     exact P 0.250 R 0.319 F1 0.280 | tol1 F1 0.450 | pred 488 gold 383
+mo  texttiling w=2 c=0.5 k=40                     exact P 0.274 R 0.264 F1 0.269 | tol1 F1 0.434 | pred 369 gold 383
+mo  texttiling w=2 c=0.5 k=60                     exact P 0.282 R 0.219 F1 0.247 | tol1 F1 0.388 | pred 298 gold 383
+mo  texttiling w=2 c=1.0 k=0                      exact P 0.280 R 0.258 F1 0.269 | tol1 F1 0.378 | pred 353 gold 383
+mo  texttiling w=2 c=1.0 k=20                     exact P 0.282 R 0.232 F1 0.255 | tol1 F1 0.375 | pred 316 gold 383
+mo  texttiling w=2 c=1.0 k=40                     exact P 0.293 R 0.201 F1 0.238 | tol1 F1 0.356 | pred 263 gold 383
+mo  texttiling w=2 c=1.0 k=60                     exact P 0.286 R 0.167 F1 0.211 | tol1 F1 0.316 | pred 224 gold 383
+mo  texttiling w=2 c=1.5 k=0                      exact P 0.267 R 0.154 F1 0.195 | tol1 F1 0.301 | pred 221 gold 383
+mo  texttiling w=2 c=1.5 k=20                     exact P 0.261 R 0.138 F1 0.181 | tol1 F1 0.290 | pred 203 gold 383
+mo  texttiling w=2 c=1.5 k=40                     exact P 0.272 R 0.123 F1 0.169 | tol1 F1 0.277 | pred 173 gold 383
+mo  texttiling w=2 c=1.5 k=60                     exact P 0.269 R 0.110 F1 0.156 | tol1 F1 0.252 | pred 156 gold 383
+mo  texttiling w=3 c=0.0 k=0                      exact P 0.210 R 0.465 F1 0.289 | tol1 F1 0.432 | pred 849 gold 383
+mo  texttiling w=3 c=0.0 k=20                     exact P 0.253 R 0.397 F1 0.309 | tol1 F1 0.494 | pred 600 gold 383
+mo  texttiling w=3 c=0.0 k=40                     exact P 0.275 R 0.311 F1 0.292 | tol1 F1 0.458 | pred 433 gold 383
+mo  texttiling w=3 c=0.0 k=60                     exact P 0.276 R 0.251 F1 0.263 | tol1 F1 0.405 | pred 348 gold 383
+mo  texttiling w=3 c=0.5 k=0                      exact P 0.245 R 0.326 F1 0.280 | tol1 F1 0.416 | pred 511 gold 383
+mo  texttiling w=3 c=0.5 k=20                     exact P 0.271 R 0.300 F1 0.285 | tol1 F1 0.433 | pred 425 gold 383
+mo  texttiling w=3 c=0.5 k=40                     exact P 0.291 R 0.256 F1 0.272 | tol1 F1 0.403 | pred 337 gold 383
+mo  texttiling w=3 c=0.5 k=60                     exact P 0.293 R 0.217 F1 0.249 | tol1 F1 0.351 | pred 283 gold 383
+mo  texttiling w=3 c=1.0 k=0                      exact P 0.295 R 0.251 F1 0.271 | tol1 F1 0.384 | pred 325 gold 383
+mo  texttiling w=3 c=1.0 k=20                     exact P 0.306 R 0.243 F1 0.271 | tol1 F1 0.378 | pred 304 gold 383
+mo  texttiling w=3 c=1.0 k=40                     exact P 0.312 R 0.211 F1 0.252 | tol1 F1 0.345 | pred 260 gold 383
+mo  texttiling w=3 c=1.0 k=60                     exact P 0.310 R 0.183 F1 0.230 | tol1 F1 0.305 | pred 226 gold 383
+mo  texttiling w=3 c=1.5 k=0                      exact P 0.289 R 0.151 F1 0.199 | tol1 F1 0.295 | pred 201 gold 383
+mo  texttiling w=3 c=1.5 k=20                     exact P 0.291 R 0.149 F1 0.197 | tol1 F1 0.290 | pred 196 gold 383
+mo  texttiling w=3 c=1.5 k=40                     exact P 0.291 R 0.133 F1 0.183 | tol1 F1 0.258 | pred 175 gold 383
+mo  texttiling w=3 c=1.5 k=60                     exact P 0.300 R 0.125 F1 0.177 | tol1 F1 0.243 | pred 160 gold 383
+mo  texttiling w=4 c=0.0 k=0                      exact P 0.208 R 0.457 F1 0.286 | tol1 F1 0.428 | pred 841 gold 383
+mo  texttiling w=4 c=0.0 k=20                     exact P 0.260 R 0.384 F1 0.310 | tol1 F1 0.489 | pred 566 gold 383
+mo  texttiling w=4 c=0.0 k=40                     exact P 0.296 R 0.329 F1 0.311 | tol1 F1 0.485 | pred 426 gold 383
+mo  texttiling w=4 c=0.0 k=60                     exact P 0.295 R 0.264 F1 0.279 | tol1 F1 0.428 | pred 342 gold 383
+mo  texttiling w=4 c=0.5 k=0                      exact P 0.253 R 0.332 F1 0.287 | tol1 F1 0.414 | pred 502 gold 383
+mo  texttiling w=4 c=0.5 k=20                     exact P 0.291 R 0.311 F1 0.301 | tol1 F1 0.439 | pred 409 gold 383
+mo  texttiling w=4 c=0.5 k=40                     exact P 0.310 R 0.279 F1 0.294 | tol1 F1 0.423 | pred 345 gold 383
+mo  texttiling w=4 c=0.5 k=60                     exact P 0.308 R 0.235 F1 0.267 | tol1 F1 0.379 | pred 292 gold 383
+mo  texttiling w=4 c=1.0 k=0                      exact P 0.284 R 0.219 F1 0.247 | tol1 F1 0.353 | pred 296 gold 383
+mo  texttiling w=4 c=1.0 k=20                     exact P 0.299 R 0.209 F1 0.246 | tol1 F1 0.356 | pred 268 gold 383
+mo  texttiling w=4 c=1.0 k=40                     exact P 0.308 R 0.198 F1 0.241 | tol1 F1 0.346 | pred 247 gold 383
+mo  texttiling w=4 c=1.0 k=60                     exact P 0.302 R 0.170 F1 0.217 | tol1 F1 0.311 | pred 215 gold 383
+mo  texttiling w=4 c=1.5 k=0                      exact P 0.328 R 0.154 F1 0.210 | tol1 F1 0.270 | pred 180 gold 383
+mo  texttiling w=4 c=1.5 k=20                     exact P 0.337 R 0.151 F1 0.209 | tol1 F1 0.274 | pred 172 gold 383
+mo  texttiling w=4 c=1.5 k=40                     exact P 0.331 R 0.141 F1 0.198 | tol1 F1 0.260 | pred 163 gold 383
+mo  texttiling w=4 c=1.5 k=60                     exact P 0.322 R 0.128 F1 0.183 | tol1 F1 0.239 | pred 152 gold 383
+mo  texttiling w=6 c=0.0 k=0                      exact P 0.196 R 0.441 F1 0.271 | tol1 F1 0.404 | pred 864 gold 383
+mo  texttiling w=6 c=0.0 k=20                     exact P 0.232 R 0.332 F1 0.273 | tol1 F1 0.462 | pred 548 gold 383
+mo  texttiling w=6 c=0.0 k=40                     exact P 0.232 R 0.245 F1 0.239 | tol1 F1 0.431 | pred 405 gold 383
+mo  texttiling w=6 c=0.0 k=60                     exact P 0.220 R 0.183 F1 0.200 | tol1 F1 0.374 | pred 318 gold 383
+mo  texttiling w=6 c=0.5 k=0                      exact P 0.221 R 0.287 F1 0.250 | tol1 F1 0.379 | pred 498 gold 383
+mo  texttiling w=6 c=0.5 k=20                     exact P 0.249 R 0.235 F1 0.242 | tol1 F1 0.392 | pred 362 gold 383
+mo  texttiling w=6 c=0.5 k=40                     exact P 0.247 R 0.185 F1 0.212 | tol1 F1 0.364 | pred 288 gold 383
+mo  texttiling w=6 c=0.5 k=60                     exact P 0.234 R 0.154 F1 0.186 | tol1 F1 0.331 | pred 252 gold 383
+mo  texttiling w=6 c=1.0 k=0                      exact P 0.267 R 0.193 F1 0.224 | tol1 F1 0.321 | pred 277 gold 383
+mo  texttiling w=6 c=1.0 k=20                     exact P 0.285 R 0.175 F1 0.217 | tol1 F1 0.320 | pred 235 gold 383
+mo  texttiling w=6 c=1.0 k=40                     exact P 0.279 R 0.151 F1 0.196 | tol1 F1 0.301 | pred 208 gold 383
+mo  texttiling w=6 c=1.0 k=60                     exact P 0.253 R 0.125 F1 0.168 | tol1 F1 0.276 | pred 190 gold 383
+mo  texttiling w=6 c=1.5 k=0                      exact P 0.252 R 0.107 F1 0.150 | tol1 F1 0.234 | pred 163 gold 383
+mo  texttiling w=6 c=1.5 k=20                     exact P 0.270 R 0.107 F1 0.153 | tol1 F1 0.239 | pred 152 gold 383
+mo  texttiling w=6 c=1.5 k=40                     exact P 0.261 R 0.094 F1 0.138 | tol1 F1 0.223 | pred 138 gold 383
+mo  texttiling w=6 c=1.5 k=60                     exact P 0.230 R 0.076 F1 0.114 | tol1 F1 0.200 | pred 126 gold 383
+mo  adapter paragraphing k=0                      exact P 0.387 R 0.546 F1 0.453 | tol1 F1 0.631 | pred 540 gold 383
+mo  adapter paragraphing k=10                     exact P 0.404 R 0.535 F1 0.461 | tol1 F1 0.647 | pred 507 gold 383
+mo  adapter paragraphing k=20                     exact P 0.409 R 0.504 F1 0.451 | tol1 F1 0.646 | pred 472 gold 383
+mo  adapter paragraphing k=30                     exact P 0.429 R 0.470 F1 0.448 | tol1 F1 0.640 | pred 420 gold 383
+mo  adapter paragraphing k=40                     exact P 0.427 R 0.410 F1 0.418 | tol1 F1 0.597 | pred 368 gold 383
+mo  adapter paragraphing k=50                     exact P 0.412 R 0.324 F1 0.363 | tol1 F1 0.544 | pred 301 gold 383
+mo  adapter paragraphing k=60                     exact P 0.404 R 0.279 F1 0.330 | tol1 F1 0.515 | pred 265 gold 383
+mo  adapter paragraphing k=80                     exact P 0.437 R 0.227 F1 0.299 | tol1 F1 0.447 | pred 199 gold 383
+mo  adapter paragraphing_asr k=0                  exact P 0.341 R 0.574 F1 0.428 | tol1 F1 0.542 | pred 646 gold 383
+mo  adapter paragraphing_asr k=10                 exact P 0.397 R 0.551 F1 0.462 | tol1 F1 0.593 | pred 531 gold 383
+mo  adapter paragraphing_asr k=20                 exact P 0.427 R 0.507 F1 0.464 | tol1 F1 0.612 | pred 454 gold 383
+mo  adapter paragraphing_asr k=30                 exact P 0.449 R 0.473 F1 0.461 | tol1 F1 0.621 | pred 403 gold 383
+mo  adapter paragraphing_asr k=40                 exact P 0.485 R 0.428 F1 0.455 | tol1 F1 0.610 | pred 338 gold 383
+mo  adapter paragraphing_asr k=50                 exact P 0.465 R 0.345 F1 0.396 | tol1 F1 0.540 | pred 284 gold 383
+mo  adapter paragraphing_asr k=60                 exact P 0.476 R 0.311 F1 0.376 | tol1 F1 0.512 | pred 250 gold 383
+mo  adapter paragraphing_asr k=80                 exact P 0.497 R 0.245 F1 0.329 | tol1 F1 0.444 | pred 189 gold 383

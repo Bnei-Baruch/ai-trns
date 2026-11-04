@@ -28,6 +28,9 @@ DIARIZE_EXTRA_THRESHOLD = float(os.environ["AI_TRNS_DIARIZE_EXTRA_THRESHOLD"]) \
 # and its key; unset = speaker turns only
 PARAGRAPHS_URL = os.environ.get("AI_TRNS_PARAGRAPHS_URL", "").rstrip("/")
 PARAGRAPHS_KEY = os.environ.get("AI_TRNS_PARAGRAPHS_KEY", "")
+# A model paragraph start closer than this many words to the one before it (or to its turn's start) is dropped:
+# on ASR text the model splits ~2x more often than the editors (TASK-paragraphs.md); 0 = every start kept
+PARAGRAPHS_MIN_WORDS = int(os.environ.get("AI_TRNS_PARAGRAPHS_MIN_WORDS", "0") or 0)
 # Transcribe Hebrew media URLs through whisper_trainer's job service at this URL (ai_trns.stt_service)
 # instead of a model here, e.g. http://10.66.1.53:8765. Uploads and other languages still use models/<lang>
 STT_URL = os.environ.get("AI_TRNS_STT_URL", "").rstrip("/")

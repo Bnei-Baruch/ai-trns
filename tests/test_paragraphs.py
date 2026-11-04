@@ -117,6 +117,18 @@ def test_the_worker_adds_the_services_paragraph_starts(service, monkeypatch):
     # sentences 1 and 3 start paragraphs: "היום" (word 2) and "עוד" (word 6)
     assert doc["paragraph_starts"] == [2, 6]
     assert "paragraphs_error" not in doc["stats"]
+    # AI_TRNS_PARAGRAPHS_MIN_WORDS: a start too close to the one before it (or to its turn's start) is dropped
+    monkeypatch.setattr(config, "PARAGRAPHS_MIN_WORDS", 2)
+    doc = doc_of(LESSON)
+    w.add_paragraphs(doc)
+    assert doc["paragraph_starts"] == [2]  # 6 is one word after its turn's start (5)
+
+
+def test_thin_starts_keeps_starts_min_words_apart_inside_a_turn():
+    words = [{"word": "w", "speaker": s} for s in ["Rav"] * 10 + ["SPEAKER_01"] * 2 + ["Rav"] * 6]
+    assert build.thin_starts(words, [2, 3, 6, 9, 13, 16], 0) == [2, 3, 6, 9, 13, 16]
+    # turn 0..9: 2 (2 from 0) dropped, then 3, 6, 9 kept; turn 12..17: 13 (1 from 12) dropped, 16 kept
+    assert build.thin_starts(words, [2, 3, 6, 9, 13, 16], 3) == [3, 6, 9, 16]
 
 
 def test_a_failing_service_leaves_speaker_turns(monkeypatch):
@@ -195,8 +207,11 @@ def test_evaluate_against_an_edited_transcript():
     assert r["speakers"]["רב"] == {"words": 8, "right": 1.0}
     assert r["speakers"]["קריין"] == {"words": 5, "right": 0.0}
     assert r["speakers"]["תלמיד"] == {"words": 1, "right": 1.0}
-    assert r["paragraphs_exact"] == {"p": 1.0, "r": 1.0, "f1": 1.0, "pred": 1, "gold": 1}
+    assert r["paragraphs_exact"] == {"p": 1.0, "r": 1.0, "f1": 1.0, "tp": 1, "pred": 1, "gold": 1}
     assert r["speaker_changes"] == {"missed": 0, "extra": 0, "both": 3}
+    # the alignment depends on the words only: given once, the same scores
+    pairs = evaluate.align(human, evaluate.model_words(result))
+    assert evaluate.evaluate(text, result, pairs) == r
 
 
 SOURCE = "ובזה תבין את דברי חז\"ל, שאמרו שהעולם נברא בשביל התורה והישראל."

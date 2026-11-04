@@ -124,6 +124,27 @@ def starts_from_sentences(index: list[int], offsets: list[int], sentences: list[
     return sorted(out)
 
 
+def thin_starts(words: list[dict], starts: Iterable[int], min_words: int) -> list[int]:
+    """Paragraph starts at least min_words words after the start before them in the same turn (or the turn's start);
+    the others dropped, earliest kept first. min_words <= 0: all kept"""
+    starts = sorted(set(starts))
+    if min_words <= 0:
+        return starts
+    turn_start, out = {}, []
+    for turn in speaker_turns(words):
+        for i in turn:
+            turn_start[i] = turn.start
+    last = {}
+    for i in starts:
+        t = turn_start.get(i)
+        if t is None:
+            continue
+        if i - last.get(t, t) >= min_words:
+            out.append(i)
+            last[t] = i
+    return out
+
+
 def paragraphs(doc: dict, source: Optional[str] = None) -> dict:
     """The "paragraphs" result of a diarize job; with the lesson's source text, turns reading it are the reader's"""
     labels.check(doc)

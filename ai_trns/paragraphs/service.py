@@ -6,12 +6,14 @@ module itself is stdlib only and imports mdb-lora's own code, so the split is th
     POST /paragraphs  {"text": "..."}  header X-API-Key
       -> {"sentences": [[start, end], ...],   # char spans in the whitespace-collapsed text ("flat")
           "breaks": [n, ...],                 # sentence numbers that start a paragraph (0 never)
-          "chunks": int, "seconds": float, "unparsed_chunks": int}
+          "chunks": int, "seconds": float, "unparsed_chunks": int, "adapter": str}
     GET /health -> {"status": "ok", "loaded": bool}
 
 One request at a time; the model loads on the first request and is unloaded after
 PARAGRAPHS_IDLE_UNLOAD_S idle seconds, so the GPU is free between lessons.
-Settings: MDB_LORA_DIR (/home/mdb-lora), PARAGRAPHS_KEY (required), PARAGRAPHS_HOST / PARAGRAPHS_PORT
+Settings: MDB_LORA_DIR (/home/mdb-lora), PARAGRAPHS_ADAPTER (paragraphing: the adapter's directory in
+mdb-lora/adapters, its config.yaml names the weights; paragraphing_asr -- the one fine-tuned on ASR text),
+PARAGRAPHS_KEY (required), PARAGRAPHS_HOST / PARAGRAPHS_PORT
 (0.0.0.0:8766), PARAGRAPHS_IDLE_UNLOAD_S (300), PARAGRAPHS_MAX_NEW_TOKENS (2048), PARAGRAPHS_MAX_CHARS (2000000).
 Run: python -m ai_trns.paragraphs.service
 """
@@ -35,11 +37,14 @@ PORT = int(os.environ.get("PARAGRAPHS_PORT", "8766"))
 IDLE_UNLOAD_S = float(os.environ.get("PARAGRAPHS_IDLE_UNLOAD_S", "300"))
 MAX_NEW_TOKENS = int(os.environ.get("PARAGRAPHS_MAX_NEW_TOKENS", "2048"))
 MAX_CHARS = int(os.environ.get("PARAGRAPHS_MAX_CHARS", "2000000"))
-ADAPTER_DIR = os.path.join(MDB_LORA_DIR, "adapters", "paragraphing")
+ADAPTER = os.environ.get("PARAGRAPHS_ADAPTER", "paragraphing")
+ADAPTER_DIR = os.path.join(MDB_LORA_DIR, "adapters", ADAPTER)
+# the sentence split and the answer format (segment.py) are paragraphing's for every adapter
+SEGMENT_DIR = os.path.join(MDB_LORA_DIR, "adapters", "paragraphing")
 
 
 def _mdb_lora_on_path():
-    for path in (os.path.join(MDB_LORA_DIR, "common"), ADAPTER_DIR):
+    for path in (os.path.join(MDB_LORA_DIR, "common"), SEGMENT_DIR):
         if path not in sys.path:
             sys.path.insert(0, path)
 
@@ -69,7 +74,7 @@ class Model:
         gen.set_adapter(adapters[0].name)
         gen.set_lora(True)
         self.gen, self.cfg = gen, cfg
-        log.info("model loaded in %.1f s", time.time() - t0)
+        log.info("model loaded in %.1f s (adapter %s, %s)", time.time() - t0, ADAPTER, adapters[0].weights_path)
 
     def split(self, text: str) -> dict:
         _mdb_lora_on_path()
@@ -92,7 +97,7 @@ class Model:
             seconds = round(time.time() - t0, 1)
             log.info("%d chars, %d sentences, %d chunks -> %d breaks in %.1f s", len(flat), len(sentences),
                      len(chunks), len(breaks), seconds)
-            return {"sentences": sentences, "breaks": sorted(breaks), "chunks": len(chunks),
+            return {"sentences": sentences, "breaks": sorted(breaks), "chunks": len(chunks), "adapter": ADAPTER,
                     "unparsed_chunks": unparsed, "seconds": seconds}
 
     def unload_if_idle(self):
@@ -122,7 +127,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            return self._send(200, {"status": "ok", "loaded": MODEL.gen is not None})
+            return self._send(200, {"status": "ok", "loaded": MODEL.gen is not None, "adapter": ADAPTER})
         self._send(404, {"detail": "not found"})
 
     def do_POST(self):
@@ -157,7 +162,7 @@ def main():
 
     threading.Thread(target=unloader, daemon=True).start()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    log.info("paragraphs service on %s:%d, mdb-lora %s", HOST, PORT, MDB_LORA_DIR)
+    log.info("paragraphs service on %s:%d, mdb-lora %s, adapter %s", HOST, PORT, MDB_LORA_DIR, ADAPTER)
     server.serve_forever()
 
 
