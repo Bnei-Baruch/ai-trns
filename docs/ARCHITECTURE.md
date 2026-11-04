@@ -62,6 +62,9 @@ ai-trns/
       submit.py            создание задачи из файла / URL и входов вида задачи
       docx_marks.py        текст из .docx и подсветка слов (/docdiff)
       config.py            настройки из окружения (AI_TRNS_*)
+    paragraphs/            абзацы урока (TASK-speakers-paragraphs.md): build.py — реплики спикеров, абзацы Рава, чтец
+                           (CPU); client.py — вызов сервиса абзацев из diarize-воркера; service.py — сам сервис
+                           (mdb-lora на stt); evaluate.py — замер против отредактированной расшифровки
     worker/                GPU-воркер
       __main__.py          цикл: аренда → аудио → распознавание → результат; кэш моделей
       client.py            HTTP-клиент к API (только стандартная библиотека)
@@ -266,6 +269,11 @@ ai-trns/
   `pyannote/speaker-diarization-community-1` принята), `pip install -r requirements-diarize.txt`. Без этого воркер
   берёт только распознавание, задачи diarize ждут в очереди. Модели одна за раз: при смене вида задачи
   предыдущая выгружается.
+- **Абзацы и метки `רב` / `קריין` / `תלמיד`** (`ai_trns/paragraphs`): diarize-задача с `paragraphs=true` после диаризации
+  отдаёт текст реплик Рава сервису абзацев (`AI_TRNS_PARAGRAPHS_URL`, mdb-lora на `stt`, `ai-trns-paragraphs`) и кладёт в
+  документ `paragraph_starts` (индексы слов). `?format=paragraphs` строит API: новый абзац на каждой смене спикера и там, где
+  его ставит модель; чтец — голос, объявляющий чтение, иначе по тексту источника (`source=` .txt/.docx). Сервис недоступен —
+  задача всё равно `done`, причина в `stats.paragraphs_error`, абзацы = реплики.
 
 ### Проверка качества STT (`/review/*`)
 
@@ -316,6 +324,7 @@ Rocky Linux 9.5 (glibc 2.34), RTX 3070 8 ГБ, 15 ГБ RAM, CUDA 13.1.
 | Что | Где |
 |---|---|
 | Модель абзацев | `/home/mdb-lora` (conda env `mdb-lora`, Qwen2.5-3B + LoRA `adapters/paragraphing/outputs/paragraphing`) |
+| Сервис абзацев | systemd `ai-trns-paragraphs` (пользователь `stt`, порт **8766**, `/home/stt/ai-trns-paragraphs`: `ai_trns/paragraphs/*` + `paragraphs.env` с ключом); 4,3 ГБ GPU при работе, выгрузка после 300 с |
 | Удалено 2026-11-04 | stt-api (`/home/stt-api`, порт 8765) и старый тестовый `ai-trns` (`/home/ai-trns`, порт 8766); бэкап на `ai-tools:/root/backup-old-20261104/stt/` |
 | Оставлено | `/home/text_audio_align`, `/home/wav2vec2-asr-pipeline`, `/home/stt-api-client` — см. `TASK-cleanup-old.md` |
 
@@ -325,9 +334,9 @@ Rocky Linux 9.5 (glibc 2.34), RTX 3070 8 ГБ, 15 ГБ RAM, CUDA 13.1.
 
 | Направление | Статус |
 |---|---|
-| `ai-tools` → `stt` | открыто (22, 8766) |
+| `ai-tools` → `stt` | открыто (22, 8766 — сервис абзацев) |
 | `stt` → `ai-tools` | **закрыто полностью**, только через Angie (`https://ai-tools.kab.info/...`) |
-| Браузер → API | пока нет. Нужен location в Angie на `ngx.kab.info`, как для `/rest/` |
+| Браузер → API | через Angie: `https://ai-tools.kab.info/ai-trns/` |
 
 Поэтому воркер на `stt` пока не может забирать задачи у API на `ai-tools`. Варианты:
 - открыть один порт `stt → ai-tools`;

@@ -200,7 +200,7 @@ def test_evaluate_against_an_edited_transcript():
 
 
 SOURCE = "ובזה תבין את דברי חז\"ל, שאמרו שהעולם נברא בשביל התורה והישראל."
-READING = [(w, "SPEAKER_02") for w in "אנחנו קוראים ובזה תבין את דברי חז\"ל, שאמרו שהעולם נברא בשביל התורה".split()]
+READING = [(w, "SPEAKER_02") for w in "שוב ובזה תבין את דברי חז\"ל, שאמרו שהעולם נברא בשביל התורה".split()]
 
 
 def test_a_turn_reading_the_source_is_the_readers():
@@ -239,3 +239,13 @@ def test_the_source_of_a_diarize_job_from_txt_or_docx(client, audio_file, tmp_pa
                                                             ("source", ("s.docx", b"not a docx"))])
     assert r.status_code == 400
     assert config.JOBS_DIR.startswith(str(tmp_path))
+
+
+def test_the_reader_is_the_voice_that_announces_the_reading():
+    announce = [(w, "SPEAKER_03") for w in "קטע מספר 2 מתוך מאמר שמעתי נקרא עכשיו".split()]
+    more = [(w, "SPEAKER_03") for w in "והאדם צריך להאמין למעלה מהדעת תמיד בכל מצב".split()]
+    relayed = [(w, "SPEAKER_03") for w in "שאלה מחבר מאיטליה מה זה אמונה למעלה מהדעת".split()]
+    asks = [(w, "SPEAKER_04") for w in "ומה זה אומר על הדרך שלנו היום בבקשה".split()]
+    doc = doc_of(announce + RAV + more + RAV + relayed + RAV + asks)
+    assert [p["label"] for p in build.paragraphs(doc)["paragraphs"]] == [
+        "קריין", "רב", "קריין", "רב", "תלמיד", "רב", "תלמיד"]

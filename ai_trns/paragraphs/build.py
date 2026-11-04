@@ -7,12 +7,18 @@ from ..diarize import labels
 
 # The speaker whose turns the paragraphing model splits (the model learned on edited lesson texts of the Rav)
 MODEL_SPEAKER = "Rav"
-# A turn of someone else is the reader's (labels.NAMES: קריין) when this share of its words is in the lesson's
-# source text: in runs of READER_NGRAM words that the source has too
+# The reader (labels.NAMES: קריין): first the voice (cluster) that announces the reading ("קטע מספר 3",
+# "אנחנו קוראים") -- its turns, except the ones that relay a question; if no voice does, the turns of someone
+# else whose words are mostly in the lesson's source text (runs of READER_NGRAM words the source has too).
+# Measured on 3 lessons against edited transcripts (TASK-speakers-paragraphs.md): the announcement alone
+# found the reader in all 3, the LIKUTIM of a lesson is sometimes another part's
 READER = "Reader"
 READER_NGRAM = 4
 READER_SHARE = 0.5
 READER_MIN_WORDS = 8
+READER_CUE_RE = re.compile(r"(קטע|קטעים) (מספר|מס)|נקרא (קטע|קטעים|בספר|מתוך)|אנחנו קוראים")
+QUESTION_RE = re.compile(r"שאלה|\?")
+READER_CUE_WORDS, QUESTION_WORDS = 20, 12
 
 _NIQQUD_RE = re.compile(r"[\u0591-\u05C7]")
 _PUNCT_RE = re.compile(r"[^\w\u05D0-\u05EA]+")
@@ -27,8 +33,21 @@ def _keys(text: str) -> list[str]:
     return [k for k in (norm(w) for w in text.split()) if k]
 
 
-def reader_turns(words: list[dict], turns: list[range], source: str) -> set[int]:
-    """Indices of the turns (not the Rav's) that read the source aloud"""
+def _head(words: list[dict], turn: range, n: int) -> str:
+    return " ".join(words[i]["word"] for i in turn[:n])
+
+
+def reader_turns(words: list[dict], turns: list[range], source: Optional[str]) -> set[int]:
+    """Indices of the turns (not the Rav's) that read the lesson's source aloud: the turns of the voice that
+    announces the reading; if none does, by the source text"""
+    others = [(t, turn) for t, turn in enumerate(turns) if turn_speaker(words, turn) not in (MODEL_SPEAKER, None)]
+    readers = {turn_speaker(words, turn) for _, turn in others if READER_CUE_RE.search(_head(words, turn, READER_CUE_WORDS))}
+    by_voice = {t for t, turn in others if turn_speaker(words, turn) in readers and len(turn) >= READER_MIN_WORDS
+                and not QUESTION_RE.search(_head(words, turn, QUESTION_WORDS))}
+    return by_voice or (_source_turns(words, turns, source) if source else set())
+
+
+def _source_turns(words: list[dict], turns: list[range], source: str) -> set[int]:
     keys = _keys(source)
     n = READER_NGRAM
     grams = {tuple(keys[i:i + n]) for i in range(len(keys) - n + 1)}
@@ -111,7 +130,7 @@ def paragraphs(doc: dict, source: Optional[str] = None) -> dict:
     words = doc["words"]
     model_starts = set(doc.get("paragraph_starts") or [])
     turns = speaker_turns(words)
-    readers = reader_turns(words, turns, source) if source else set()
+    readers = reader_turns(words, turns, source)
     out = []
     for t, turn in enumerate(turns):
         speaker = READER if t in readers else turn_speaker(words, turn)
