@@ -36,6 +36,10 @@ COMPUTE_TYPE = os.environ.get("AI_TRNS_COMPUTE_TYPE", "float16")
 BATCH_SIZE = int(os.environ.get("AI_TRNS_BATCH_SIZE", "8"))
 # The GPU is shared with other services: unload models after this many idle seconds (loading takes ~1 s)
 IDLE_UNLOAD_S = float(os.environ.get("AI_TRNS_IDLE_UNLOAD_S", "300"))
+# Several workers on one GPU: take a job only while at least this much GPU memory is free (MiB, nvidia-smi),
+# unless this worker's models are loaded already; 0 = always. Keeps room for the live worker (see ARCHITECTURE)
+MIN_FREE_GPU_MB = int(os.environ.get("AI_TRNS_MIN_FREE_GPU_MB", "0"))
+GPU_INDEX = os.environ.get("AI_TRNS_GPU_INDEX", "0")
 # How often to ask for a job while the queue is empty
 POLL_S = float(os.environ.get("AI_TRNS_POLL_S", "3"))
 WORK_DIR = os.environ.get("AI_TRNS_WORK_DIR", "./work")

@@ -138,3 +138,23 @@ def test_worker_diarizes_with_the_job_cues_and_samples(server, worker, audio_fil
     finally:
         stop.set()
         thread.join(timeout=10)
+
+
+def test_a_worker_waits_for_gpu_memory(monkeypatch):
+    from ai_trns.worker import __main__ as w
+    from ai_trns.worker import config
+    models = w.Models()
+    monkeypatch.setattr(config, "MIN_FREE_GPU_MB", 0)
+    assert w.gpu_has_room(models)
+    monkeypatch.setattr(config, "MIN_FREE_GPU_MB", 4000)
+    monkeypatch.setattr(w, "free_gpu_mb", lambda: 3000)
+    assert not w.gpu_has_room(models)
+    # its own model is loaded already: the memory is counted in
+    models.loaded["he"] = object()
+    assert w.gpu_has_room(models)
+    models.loaded.clear()
+    monkeypatch.setattr(w, "free_gpu_mb", lambda: 5000)
+    assert w.gpu_has_room(models)
+    # no nvidia-smi: do not block
+    monkeypatch.setattr(w, "free_gpu_mb", lambda: None)
+    assert w.gpu_has_room(models)

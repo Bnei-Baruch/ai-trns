@@ -87,6 +87,25 @@ def by_service(job: dict) -> bool:
         and "url" in job["source"]
 
 
+def free_gpu_mb() -> Optional[int]:
+    """Free memory of this worker's GPU by nvidia-smi; None if it cannot tell"""
+    import subprocess
+    try:
+        out = subprocess.run(["nvidia-smi", "-i", config.GPU_INDEX, "--query-gpu=memory.free",
+                              "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=10)
+        return int(out.stdout.strip().splitlines()[0])
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        return None
+
+
+def gpu_has_room(models: "Models") -> bool:
+    """Whether to ask for a job now: always with AI_TRNS_MIN_FREE_GPU_MB=0 or a model loaded here already"""
+    if config.MIN_FREE_GPU_MB <= 0 or models.loaded:
+        return True
+    free = free_gpu_mb()
+    return free is None or free >= config.MIN_FREE_GPU_MB
+
+
 class Heartbeat:
     """Reports progress and keeps the lease alive from a thread, so a long step cannot lose the job"""
 
@@ -308,7 +327,15 @@ def main(stop: Optional[threading.Event] = None):
     models = Models()
     log.info("worker %s: API %s, engines %s, langs %s%s", config.WORKER_ID, config.API_URL, ",".join(engines),
              ",".join(langs), f", transcribing by {config.STT_URL}" if config.STT_URL else "")
+    waiting_for_gpu = False
     while not stop.is_set():
+        if not gpu_has_room(models):
+            if not waiting_for_gpu:
+                log.info("less than %d MiB GPU memory free: not taking jobs for now", config.MIN_FREE_GPU_MB)
+            waiting_for_gpu = True
+            stop.wait(config.POLL_S)
+            continue
+        waiting_for_gpu = False
         try:
             job = client.lease(langs, engines)
         except Exception as e:
