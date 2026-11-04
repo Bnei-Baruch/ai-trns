@@ -11,7 +11,9 @@ WORKER_KEY = os.environ.get("AI_TRNS_WORKER_KEY", "")
 WORKER_ID = os.environ.get("AI_TRNS_WORKER_ID", f"{socket.gethostname()}-{os.getpid()}")
 
 MODELS_DIR = os.environ.get("AI_TRNS_MODELS_DIR", "./models")
-# Engines this worker runs: transcribe (faster-whisper), diarize (pyannote + MMS, requirements-diarize.txt)
+# Engines this worker runs: transcribe (faster-whisper), diarize (pyannote + MMS, requirements-diarize.txt),
+# live (faster-whisper on a stream, ai_trns.live: always the model here, even with AI_TRNS_STT_URL).
+# A live job holds its worker for the whole stream: give live its own worker
 ENGINES = _list("AI_TRNS_WORKER_ENGINES") or ["transcribe"]
 # diarize: built-in voice samples, <dir>/<Name>/*.mp3 (or <dir>/<Name>.mp3); the pyannote pipeline and
 # a HuggingFace token with its license accepted

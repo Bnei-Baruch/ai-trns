@@ -6,6 +6,7 @@ What a job makes of its worker's document, by kind (ai_trns.api.jobs.kind_of). C
     tadiff      transcribe   text.txt                 diff, txt, srt, json
     docdiff     transcribe   doc.docx                 docx, diff, txt, srt, json
     diarize     diarize      cues.json, sample<i>.*   srt, json
+    live        live         -                        srt, txt, json
 
 json is always the worker's document as is: a words document (ai_trns.words) from the
 transcribe engine, a diarization document (ai_trns.diarize) from the diarize one.
@@ -33,6 +34,7 @@ FORMATS = {
     "tadiff": ("diff", "txt", "srt", "json"),
     "docdiff": ("docx", "diff", "txt", "srt", "json"),
     "diarize": ("srt", "json"),
+    "live": ("srt", "txt", "json"),
 }
 # Counters a finished job keeps ("stats" in the job view, X-<Kind>-* headers of its result)
 STATS = {

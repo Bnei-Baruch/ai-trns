@@ -46,6 +46,10 @@ ai-trns/
     diarize/               спикеры: engine.py — движок воркера (pyannote, MMS-CTC); srt, mapping,
                            resegment, labels — без моделей
     audio.py               ffprobe / ffmpeg: длительность, конвертация, декодирование в массив
+    live/                  потоковое распознавание (движок воркера live): stream.py — LocalAgreement поверх
+                           Whisper; source.py — ffmpeg (.sdp / URL / файл) → PCM; engine.py — источник → события;
+                           hub.py — события для слушателей (SSE, только stdlib: его импортирует API);
+                           python -m ai_trns.live — проба без API, --serve — демо-страница (demo.py, demo.html)
     transcriber.py         модель faster-whisper + профили декодирования → документ со словами
     api/                   API-сервер (FastAPI), без GPU
       app.py               эндпоинты клиентов и воркеров
@@ -53,6 +57,7 @@ ai-trns/
       jobs.py              хранилище задач (SQLite): очередь, аренда, истечение, TTL
       review.py            проверка качества STT людьми (/review/*, перенесено из stt-api)
       tadiff.py, diarize.py  /tadiff, /docdiff, /diarize (перенесено из stt-api): создают задачи
+      live.py              /live: задача вида live, её события по SSE, стоп (TASK-live-transcription.md)
       results.py           виды задач: форматы результата и их рендер, счётчики
       submit.py            создание задачи из файла / URL и входов вида задачи
       docx_marks.py        текст из .docx и подсветка слов (/docdiff)

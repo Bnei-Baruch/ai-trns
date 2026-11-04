@@ -55,11 +55,16 @@ class Client:
     def file_path(job_id: str, name: str) -> str:
         return f"/worker/jobs/{job_id}/files/{quote(name)}"
 
-    def heartbeat(self, job_id: str, stage: str, progress: float) -> bool:
-        """True if the job was cancelled (or is no longer this worker's)"""
-        reply = self._json("POST", f"/worker/jobs/{job_id}/heartbeat",
-                           {"worker": self.worker, "stage": stage, "progress": round(progress, 4)})
-        return bool(reply.get("cancel"))
+    def heartbeat(self, job_id: str, stage: str, progress: float) -> dict:
+        """{"cancel": true} if the job was cancelled (or is no longer this worker's), "stop" if a live
+        job is to finish now"""
+        return self._json("POST", f"/worker/jobs/{job_id}/heartbeat",
+                          {"worker": self.worker, "stage": stage, "progress": round(progress, 4)})
+
+    def events(self, job_id: str, events: list) -> bool:
+        """A live job's events for its listeners; True if the job is to finish now"""
+        reply = self._json("POST", f"/worker/jobs/{job_id}/events", {"worker": self.worker, "events": events})
+        return bool(reply.get("stop"))
 
     def result(self, job_id: str, doc: dict):
         self._json("PUT", f"/worker/jobs/{job_id}/result{self._q()}", doc)

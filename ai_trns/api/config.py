@@ -38,6 +38,14 @@ TRANSCRIBE_UPLOADS = os.environ.get("AI_TRNS_TRANSCRIBE_UPLOADS", "0").lower() i
 MAX_ATTEMPTS = int(os.environ.get("AI_TRNS_MAX_ATTEMPTS", "3"))
 JOB_TTL_HOURS = float(os.environ.get("AI_TRNS_JOB_TTL_HOURS", "72"))
 
+# Live text into a Google Doc the server creates per live job (ai_trns.api.gdoc): the account's JSON
+# (a service account's key or an authorized_user); empty = off. The folder to create docs in (a service
+# account needs one in a shared drive); the role anyone with the link gets ("reader", "commenter",
+# "writer"; empty: only who the folder is shared with)
+GOOGLE_CREDENTIALS = os.environ.get("AI_TRNS_GOOGLE_CREDENTIALS", "")
+GOOGLE_FOLDER = os.environ.get("AI_TRNS_GOOGLE_FOLDER", "")
+GOOGLE_DOC_ROLE = os.environ.get("AI_TRNS_GOOGLE_DOC_ROLE", "")
+
 # Human review of STT (ai_trns.api.review): sets, lessons and results as JSON files
 REVIEW_DIR = os.environ.get("AI_TRNS_REVIEW_DIR", "./review")
 # The model reviewers are told they review; default: the model of the newest transcribed lesson

@@ -1,8 +1,9 @@
 """
 GPU worker: lease a job from the API, get its audio, run it through an engine, send back the
 document. Engines: transcribe (faster-whisper -> words document, or whisper_trainer's service
-with AI_TRNS_STT_URL: ai_trns.stt_service) and diarize (pyannote + MMS -> diarization document,
-ai_trns.diarize). One job at a time per worker (one worker per GPU).
+with AI_TRNS_STT_URL: ai_trns.stt_service), diarize (pyannote + MMS -> diarization document,
+ai_trns.diarize) and live (a stream -> events while it plays, then a words document: ai_trns.live).
+One job at a time per worker (one worker per GPU).
 Run: python -m ai_trns.worker
 """
 import gc
@@ -25,7 +26,7 @@ log = logging.getLogger("ai-trns.worker")
 
 # Share of the job's progress taken by audio conversion; the rest is the engine
 CONVERT_SHARE = 0.1
-DIARIZE = "diarize"
+DIARIZE, LIVE = "diarize", "live"
 
 
 class Models:
@@ -84,6 +85,8 @@ class Heartbeat:
         self.client, self.job_id = client, job_id
         self.stage, self.progress = "starting", 0.0
         self.cancelled = threading.Event()
+        # a live job is to finish now, with what it has
+        self.finish = threading.Event()
         self.stopped = threading.Event()
         self.thread = threading.Thread(target=self._loop, name="heartbeat", daemon=True)
 
@@ -101,8 +104,11 @@ class Heartbeat:
     def _loop(self):
         while not self.stopped.is_set():
             try:
-                if self.client.heartbeat(self.job_id, self.stage, self.progress):
+                reply = self.client.heartbeat(self.job_id, self.stage, self.progress)
+                if reply.get("cancel"):
                     self.cancelled.set()
+                if reply.get("stop"):
+                    self.finish.set()
             except Exception as e:
                 # the lease survives a few missed beats
                 log.warning("job %s: heartbeat failed: %s", self.job_id, e)
@@ -129,6 +135,55 @@ def diarize(client: Client, models: Models, job: dict, job_dir: str, wav_file: s
         wav_file, cues, samples, lang=params["lang"], speakers=params.get("speakers"),
         on_progress=lambda p: beat.update("diarizing", CONVERT_SHARE + (1 - CONVERT_SHARE) * p),
         should_cancel=beat.cancelled.is_set)
+
+
+def live(client: Client, models: Models, job: dict, beat: "Heartbeat",
+         shutdown: Optional[threading.Event] = None) -> Optional[dict]:
+    """The live engine: the job's stream (or a recording at its natural pace), events to the API after every decode;
+    None if cancelled. Asked to stop, or the worker shutting down: the result is what was heard so far"""
+    from ..live.engine import run
+    from ..live.source import AudioSource, is_live
+    from ..live.stream import StreamProcessor, WhisperAsr, build_live_document
+    job_id, lang = job["id"], job["params"]["lang"]
+    if "url" not in job["source"]:
+        raise RuntimeError("a live job needs a URL")
+    beat.update("loading_model", 0.0)
+    transcriber = models.get(lang)
+    processor = StreamProcessor(WhisperAsr(transcriber))
+    pending = []
+
+    def on_event(e: dict):
+        # partials only matter until the next one: keep the latest
+        if e["type"] == "partial":
+            pending[:] = [p for p in pending if p["type"] != "partial"]
+        pending.append(e)
+        try:
+            if client.events(job_id, pending):
+                beat.finish.set()
+            pending.clear()
+        except ApiError as err:
+            if err.status == 409:
+                beat.cancelled.set()
+            log.warning("job %s: events not sent: %s", job_id, err)
+        except Exception as err:
+            # kept and sent with the next ones
+            log.warning("job %s: events not sent: %s", job_id, err)
+        beat.update("live", 0.0)
+        models.last_used = time.time()
+
+    beat.update("live", 0.0)
+    url = job["source"]["url"]
+    # a recording is read at its natural pace, as if it were broadcast
+    with AudioSource(url, realtime=not is_live(url)) as source:
+        duration = run(source, processor, on_event,
+                       should_stop=lambda: beat.cancelled.is_set() or beat.finish.is_set()
+                       or bool(shutdown and shutdown.is_set()))
+    if beat.cancelled.is_set():
+        log.info("job %s cancelled", job_id)
+        return None
+    models.last_used = time.time()
+    return build_live_document(processor.final, duration, lang, transcriber.name,
+                               transcriber.meta.get("boundary_correction_s"))
 
 
 def transcribe_by_service(job: dict, beat: "Heartbeat") -> Optional[dict]:
@@ -182,13 +237,15 @@ def run_locally(client: Client, models: Models, job: dict, job_dir: str, beat: "
     return doc
 
 
-def run_job(client: Client, models: Models, job: dict):
+def run_job(client: Client, models: Models, job: dict, shutdown: Optional[threading.Event] = None):
     job_id, params = job["id"], job["params"]
     job_dir = os.path.join(config.WORK_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
     try:
         with Heartbeat(client, job_id) as beat:
-            if config.STT_URL and params.get("kind") != DIARIZE:
+            if params.get("kind") == LIVE:
+                doc = live(client, models, job, beat, shutdown)
+            elif config.STT_URL and params.get("kind") != DIARIZE:
                 doc = transcribe_by_service(job, beat)
             else:
                 doc = run_locally(client, models, job, job_dir, beat)
@@ -218,7 +275,8 @@ def main(stop: Optional[threading.Event] = None):
         raise SystemExit(f"no models in {config.MODELS_DIR}")
     stop = stop or threading.Event()
     if threading.current_thread() is threading.main_thread():
-        # finish the running job, then exit; if killed first, its lease expires and it is retried
+        # finish the running job (a live one: with what it heard so far), then exit; if killed first,
+        # its lease expires and it is retried
         signal.signal(signal.SIGTERM, lambda *_: stop.set())
     client = Client(config.API_URL, config.WORKER_KEY, config.WORKER_ID)
     models = Models()
@@ -240,7 +298,7 @@ def main(stop: Optional[threading.Event] = None):
         params = job["params"]
         log.info("job %s: %s, lang %s, formats %s", job["id"], params.get("kind", "transcribe"), params["lang"],
                  params["formats"])
-        run_job(client, models, job)
+        run_job(client, models, job, stop)
 
 
 if __name__ == "__main__":

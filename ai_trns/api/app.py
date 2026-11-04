@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, Response
 
 from .. import protocol
 from ..subtitles import render
-from . import config, diarize, results, review, tadiff
+from . import config, diarize, live, results, review, tadiff
 from .auth import Principal, can_see, principal
 from .jobs import CANCELLED, DONE, ERROR, QUEUED, RUNNING, TRANSCRIBE, JobStore, kind_of
 from .submit import UPLOAD, create_job as submit_job, job_view as view_of
@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI):
     if not config.WORKER_KEY:
         log.warning("AI_TRNS_WORKER_KEY is not set: no worker can connect")
     store = JobStore()
+    hubs = live.Live()
     stop = threading.Event()
 
     def maintenance():
@@ -50,10 +51,12 @@ async def lifespan(app: FastAPI):
                 log.warning("job %s: lease expired, now %s", job_id, job["status"])
                 if job["status"] == ERROR:
                     drop_upload(job_id)
+                    hubs.publish(job_id, {"type": "error", "message": job["error"]})
             try:
                 review.sync_all(store)
             except Exception:
                 log.exception("review: sync failed")
+            hubs.cleanup(store)
             if time.time() - last_cleanup > 3600:
                 last_cleanup = time.time()
                 removed = store.cleanup()
@@ -62,6 +65,7 @@ async def lifespan(app: FastAPI):
 
     threading.Thread(target=maintenance, name="maintenance", daemon=True).start()
     app.state.store = store
+    app.state.live = hubs
     app.state.workers = {}
     yield
     stop.set()
@@ -77,6 +81,7 @@ app.include_router(review.router)
 app.include_router(tadiff.tadiff)
 app.include_router(tadiff.docdiff)
 app.include_router(diarize.router)
+app.include_router(live.router)
 
 
 def require_worker(request: Request):
@@ -92,10 +97,11 @@ def job_view(job: dict) -> dict:
     return view_of(app.state.store, job)
 
 
-def get_job(job_id: str, who: Principal) -> dict:
+def get_job(job_id: str, who: Principal, shared: bool = False) -> dict:
+    """shared: a broadcast's live job is anyone's to read (ai_trns.api.live), not to cancel"""
     job = app.state.store.get(job_id)
     # someone else's job looks the same as a missing one
-    if job is None or not can_see(who, job):
+    if job is None or not (can_see(who, job) or (shared and live.is_shared(job))):
         raise HTTPException(404, "job not found")
     return job
 
@@ -145,7 +151,7 @@ def list_jobs(who: Principal = Depends(principal), limit: int = Query(50, ge=1, 
 
 @app.get("/jobs/{job_id}")
 def job_status(job_id: str, who: Principal = Depends(principal)):
-    return job_view(get_job(job_id, who))
+    return job_view(get_job(job_id, who, shared=True))
 
 
 @app.get("/jobs/{job_id}/result")
@@ -154,7 +160,7 @@ def job_result(job_id: str, format: Optional[str] = Query(None, description="def
                fix_rtl: Optional[bool] = None, who: Principal = Depends(principal)):
     """The result as rendered when the job finished, or rendered now from the worker's document.
     The job's stats come as X-<Kind>-* headers too"""
-    job = get_job(job_id, who)
+    job = get_job(job_id, who, shared=True)
     if job["status"] != DONE:
         raise HTTPException(409, f"job is {job['status']}")
     params = job["params"]
@@ -181,6 +187,7 @@ def cancel_job(job_id: str, who: Principal = Depends(principal)):
         raise HTTPException(409, "job is already finished")
     app.state.store.update(job_id, status=CANCELLED, finished=time.time())
     drop_upload(job_id)
+    app.state.live.publish(job_id, {"type": "error", "message": "cancelled"})
     return job_view(get_job(job_id, who))
 
 
@@ -219,6 +226,8 @@ def worker_lease(body: dict = Body(...)):
         return Response(status_code=204)
     seen(worker, job=job["id"])
     log.info("job %s leased to %s (attempt %d)", job["id"], worker, job["attempts"])
+    if live.is_live(job):
+        app.state.live.leased(job["id"])
     source = {"upload": f"/worker/jobs/{job['id']}/audio"} if job["source"] == UPLOAD else {"url": job["source"]}
     return {"id": job["id"], "params": job["params"], "source": source, "lease_s": protocol.LEASE_S}
 
@@ -248,7 +257,20 @@ def worker_heartbeat(job_id: str, body: dict = Body(...)):
     seen(worker, job=job_id)
     alive = app.state.store.heartbeat(job_id, worker, body.get("stage"), float(body.get("progress", 0)),
                                       protocol.LEASE_S)
+    if alive and job_id in app.state.live.stopping:
+        return {"cancel": False, "stop": True}
     return {"cancel": not alive}
+
+
+@app.post("/worker/jobs/{job_id}/events", dependencies=[Depends(require_worker)])
+def worker_events(job_id: str, body: dict = Body(...)):
+    """A live job's start / final / partial events, passed on to its listeners"""
+    owned_job(job_id, str(body["worker"]))
+    hubs = app.state.live
+    for event in body.get("events", []):
+        if event.get("type") in ("start", "final", "partial"):
+            hubs.publish(job_id, event)
+    return {"stop": job_id in hubs.stopping}
 
 
 @app.put("/worker/jobs/{job_id}/result", dependencies=[Depends(require_worker)])
@@ -269,10 +291,12 @@ def worker_result(job_id: str, worker: str, doc: dict = Body(...)):
         log.exception("job %s: bad document from %s", job_id, worker)
         store.update(job_id, status=ERROR, error=f"bad document: {e}", finished=time.time())
         drop_upload(job_id)
+        app.state.live.publish(job_id, {"type": "error", "message": f"bad document: {e}"})
         raise HTTPException(422, f"bad document: {e}")
     store.update(job_id, status=DONE, stage=None, progress=1.0, finished=time.time(),
                  stats=json.dumps(stats) if stats else None)
     drop_upload(job_id)
+    app.state.live.publish(job_id, {"type": "end", "duration_s": doc.get("duration_s")})
     log.info("job %s done by %s", job_id, worker)
     return {"ok": True}
 
@@ -285,5 +309,6 @@ def worker_fail(job_id: str, body: dict = Body(...)):
     app.state.store.update(job_id, status=ERROR, error=str(body.get("error", "worker error")),
                            finished=time.time())
     drop_upload(job_id)
+    app.state.live.publish(job_id, {"type": "error", "message": str(body.get("error", "worker error"))})
     log.warning("job %s failed on %s: %s", job_id, worker, body.get("error"))
     return {"ok": True}

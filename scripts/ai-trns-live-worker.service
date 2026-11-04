@@ -1,0 +1,17 @@
+[Unit]
+Description=ai-trns live worker (AI_TRNS_WORKER_ENGINES=live)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ai-trns
+WorkingDirectory=/home/ai-trns
+EnvironmentFile=/home/ai-trns/ai-trns-live-worker.env
+ExecStart=/home/ai-trns/app/scripts/run_worker.sh
+Restart=on-failure
+RestartSec=10
+# SIGTERM ends a running live job with what it heard so far
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

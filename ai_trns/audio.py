@@ -11,12 +11,25 @@ def is_url(source: str) -> bool:
     return bool(_url_re.match(source))
 
 
+def host_allowed(host: str, allowed_hosts: list) -> bool:
+    """An entry is a host, or ".example.org" for any subdomain of example.org"""
+    return any(host == h or (h.startswith(".") and host.endswith(h)) for h in allowed_hosts)
+
+
+LIVE_EXTENSIONS = (".m3u8", ".mpd", ".sdp")
+
+
+def is_live(source: str) -> bool:
+    """A stream that comes at its own pace (HLS, DASH, RTP), as opposed to a recording"""
+    return urlparse(source).path.lower().endswith(LIVE_EXTENSIONS)
+
+
 def check_url(url: str, allowed_hosts: list):
     """Empty allowed_hosts = any host"""
     parsed = urlparse(url)
     if parsed.scheme.lower() not in ("http", "https"):
         raise ValueError("only http(s) URLs are allowed")
-    if allowed_hosts and parsed.hostname not in allowed_hosts:
+    if allowed_hosts and not host_allowed(parsed.hostname or "", allowed_hosts):
         raise ValueError(f"host {parsed.hostname!r} is not allowed")
 
 

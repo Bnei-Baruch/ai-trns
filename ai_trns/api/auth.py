@@ -56,8 +56,9 @@ def _user(token: str) -> Principal:
     if config.OIDC_CLIENTS and claims.get("azp") not in config.OIDC_CLIENTS:
         raise HTTPException(403, f"tokens of client {claims.get('azp')!r} are not accepted")
     roles = set(claims.get("realm_access", {}).get("roles", []))
-    if config.OIDC_ROLE and config.OIDC_ROLE not in roles:
-        raise HTTPException(403, f"role {config.OIDC_ROLE!r} required")
+    # TODO: role check is temporarily off, every Keycloak user is let in
+    # if config.OIDC_ROLE and config.OIDC_ROLE not in roles:
+    #     raise HTTPException(403, f"role {config.OIDC_ROLE!r} required")
     name = claims.get("email") or claims.get("preferred_username") or claims["sub"]
     return Principal(owner=f"user:{claims['sub']}", name=name,
                      sees_all=bool(config.ADMIN_ROLE) and config.ADMIN_ROLE in roles)

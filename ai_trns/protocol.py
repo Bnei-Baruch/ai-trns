@@ -5,12 +5,14 @@ so a worker only needs outbound HTTP to the API.
     POST /worker/lease                     {"worker", "langs": [...], "engines": [...]} -> 200 job | 204 nothing to do
     GET  /worker/jobs/{id}/audio           the uploaded file of a job with an upload source
     GET  /worker/jobs/{id}/files/{name}    another input: a diarize job's cues.json and voice samples
-    POST /worker/jobs/{id}/heartbeat       {"worker", "stage", "progress"} -> {"cancel": bool}
+    POST /worker/jobs/{id}/heartbeat       {"worker", "stage", "progress"} -> {"cancel": bool, "stop": true if asked}
+    POST /worker/jobs/{id}/events          a live job's {"worker", "events": [...]} -> {"stop": bool}
     PUT  /worker/jobs/{id}/result          words document (ai_trns.words) or diarization document (ai_trns.diarize)
     POST /worker/jobs/{id}/fail            {"worker", "error"}
 
 A worker gets transcriptions in its langs and jobs of its other engines ("engines" absent:
-["transcribe"]); params["kind"] == "diarize" is the diarize engine's.
+["transcribe"]); params["kind"] == "diarize" is the diarize engine's, "live" the live engine's.
+A live job asked to stop ("stop") ends with what it has, as a normal result; "cancel" ends with none.
 A leased job is the worker's until the lease runs out; every heartbeat extends it. A lost
 worker's job goes back to the queue. Requests carry the worker key and the protocol version
 in headers. Stdlib only: the worker may run inside another project's locked environment.

@@ -13,8 +13,9 @@ QUEUED, RUNNING, DONE, ERROR, CANCELLED = "queued", "running", "done", "error", 
 FINAL = (DONE, ERROR, CANCELLED)
 
 # Worker engines; a job's engine follows from its kind (params["kind"], "transcribe" if absent)
-TRANSCRIBE, DIARIZE = "transcribe", "diarize"
-KIND_ENGINES = {"transcribe": TRANSCRIBE, "tadiff": TRANSCRIBE, "docdiff": TRANSCRIBE, "diarize": DIARIZE}
+TRANSCRIBE, DIARIZE, LIVE = "transcribe", "diarize", "live"
+KIND_ENGINES = {"transcribe": TRANSCRIBE, "tadiff": TRANSCRIBE, "docdiff": TRANSCRIBE, "diarize": DIARIZE,
+                "live": LIVE}
 
 
 def kind_of(params: dict) -> str:
@@ -102,6 +103,11 @@ class JobStore:
         with self.lock:
             rows = self.db.execute(
                 "SELECT id FROM jobs WHERE status = ? ORDER BY created", (QUEUED,)).fetchall()
+        return [r["id"] for r in rows]
+
+    def running_ids(self) -> list:
+        with self.lock:
+            rows = self.db.execute("SELECT id FROM jobs WHERE status = ? ORDER BY created", (RUNNING,)).fetchall()
         return [r["id"] for r in rows]
 
     def queue_position(self, job_id: str) -> Optional[int]:

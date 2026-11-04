@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live-транскрипция</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #6b7280; --border: #e2e5ea;
+    --accent: #2563eb; --accent-soft: #dbe6fe; --partial: #9aa1ad; --live: #dc2626; --ok: #15803d;
+    --mark: #fde68a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111418; --panel: #1a1e24; --text: #e6e8eb; --muted: #9aa1ad; --border: #2c323b;
+      --accent: #6b9bff; --accent-soft: #23324f; --partial: #6b7280; --live: #f87171; --ok: #4ade80;
+      --mark: #5b4a12;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 20px 16px 32px; display: flex; flex-direction: column;
+         gap: 14px; height: 100vh; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px;
+          border: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+  .pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.live { color: var(--live); border-color: var(--live); }
+  .pill.live::before { background: var(--live); animation: blink 1.2s infinite; }
+  .pill.ended { color: var(--ok); border-color: var(--ok); }
+  .pill.ended::before { background: var(--ok); }
+  .pill.error { color: var(--live); border-color: var(--live); }
+  @keyframes blink { 50% { opacity: .3; } }
+  .stats { margin-inline-start: auto; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .player { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  audio { flex: 1; min-width: 240px; height: 40px; }
+  .note { color: var(--muted); font-size: 14px; }
+  button { font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 8px; cursor: pointer;
+           border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .toolbar label { color: var(--muted); font-size: 14px; display: inline-flex; gap: 6px; align-items: center; }
+  .toolbar .spacer { flex: 1; }
+  .text-wrap { position: relative; flex: 1; min-height: 200px; display: flex; }
+  #text { flex: 1; overflow-y: auto; font-size: 20px; line-height: 1.8; padding: 16px 18px; white-space: normal;
+          word-wrap: break-word; }
+  #text:empty::before { content: attr(data-empty); color: var(--muted); font-size: 15px; display: block;
+                        unicode-bidi: plaintext; }
+  #text .w { cursor: pointer; border-radius: 4px; padding: 0 1px; }
+  #text .w:hover { background: var(--accent-soft); }
+  #text .w.now { background: var(--mark); }
+  #text .partial { color: var(--partial); }
+  #text .err { color: var(--live); font-size: 15px; }
+  #follow { position: absolute; bottom: 12px; inset-inline-end: 12px; display: none; box-shadow: 0 2px 8px #0003; }
+  #follow.show { display: block; }
+  .hide-partial #text .partial { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Live-транскрипция</h1>
+    <span id="state" class="pill">ожидание</span>
+    <span id="stats" class="stats"></span>
+  </header>
+
+  <section class="card player">
+    <audio id="audio" controls preload="metadata" hidden></audio>
+    <span id="no-player" class="note" hidden>Источник без плеера (RTP / Janus): только текст.</span>
+    <button id="start" class="primary" hidden>Старт</button>
+  </section>
+
+  <section class="toolbar">
+    <label><input type="checkbox" id="show-partial" checked> черновик</label>
+    <label><input type="checkbox" id="highlight" checked> подсветка по плееру</label>
+    <span class="spacer"></span>
+    <button id="copy">Копировать</button>
+    <button id="srt" disabled>SRT</button>
+    <button id="json" disabled>JSON</button>
+  </section>
+
+  <section class="card text-wrap">
+    <div id="text" data-empty="Нажмите ▶ — текст появится здесь через пару секунд."></div>
+    <button id="follow">↓ к концу</button>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const audio = $("audio"), text = $("text");
+const STATES = { idle: "ожидание", live: "идёт", ended: "завершено", error: "ошибка" };
+const RTL = ["he", "ar", "yi", "fa"];
+
+const finals = [];          // {start_s, end_s, el}
+let partialEl = null, events = null, started = false, follow = true, lastEnd = 0;
+
+function setState(state) {
+  const el = $("state");
+  el.className = "pill " + state;
+  el.textContent = STATES[state] || state;
+  const done = state === "ended";
+  for (const id of ["srt", "json"]) $(id).disabled = !done;
+}
+
+function wordSpan(w) {
+  const span = document.createElement("span");
+  span.className = "w";
+  span.textContent = w.word;
+  span.dataset.start = w.start_s;
+  return span;
+}
+
+function addFinal(words) {
+  for (const w of words) {
+    const span = wordSpan(w);
+    text.insertBefore(span, partialEl);
+    text.insertBefore(document.createTextNode(" "), partialEl);
+    finals.push({ start_s: w.start_s, end_s: w.end_s, el: span });
+    lastEnd = w.end_s;
+  }
+}
+
+function setPartial(words) {
+  if (!partialEl) {
+    partialEl = document.createElement("span");
+    partialEl.className = "partial";
+    text.appendChild(partialEl);
+  }
+  partialEl.textContent = words.map((w) => w.word).join(" ");
+}
+
+function onEvent(e) {
+  if (e.type === "final") addFinal(e.words);
+  else if (e.type === "partial") {
+    setPartial(e.words);
+    const behind = Math.max(0, e.end_s - lastEnd);
+    $("stats").textContent = `звук: ${fmt(e.end_s)} · готово до ${fmt(lastEnd)} · проход ${e.decode_s.toFixed(2)} с`;
+    $("stats").title = `текст отстаёт от звука на ${behind.toFixed(1)} с`;
+  } else if (e.type === "end") {
+    setPartial([]);
+    setState("ended");
+    events && events.close();
+  } else if (e.type === "error") {
+    const p = document.createElement("div");
+    p.className = "err";
+    p.textContent = "Ошибка: " + e.message;
+    text.appendChild(p);
+    setState("error");
+    events && events.close();
+  }
+  if (follow) text.scrollTop = text.scrollHeight;
+}
+
+function fmt(s) {
+  s = Math.max(0, s || 0);
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
+function listen() {
+  if (events) return;
+  events = new EventSource("events");
+  events.onmessage = (m) => onEvent(JSON.parse(m.data));
+}
+
+async function start() {
+  if (started) return;
+  started = true;
+  $("start").disabled = true;
+  const r = await fetch("start", { method: "POST" }).then((r) => r.json());
+  setState(r.state);
+  listen();
+}
+
+// highlight the word being played; finals are in time order, so a binary search
+let current = null;
+function tick() {
+  if ($("highlight").checked && !audio.hidden && finals.length) {
+    const t = audio.currentTime;
+    let lo = 0, hi = finals.length - 1, found = null;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (finals[mid].start_s <= t) { found = finals[mid]; lo = mid + 1; } else hi = mid - 1;
+    }
+    if (found && t > found.end_s + 0.6) found = null;
+    if (found !== current) {
+      current && current.el.classList.remove("now");
+      found && found.el.classList.add("now");
+      current = found;
+    }
+  } else if (current) {
+    current.el.classList.remove("now");
+    current = null;
+  }
+  requestAnimationFrame(tick);
+}
+
+text.addEventListener("click", (e) => {
+  const w = e.target.closest(".w");
+  if (w && !audio.hidden) audio.currentTime = Number(w.dataset.start);
+});
+text.addEventListener("scroll", () => {
+  follow = text.scrollHeight - text.scrollTop - text.clientHeight < 40;
+  $("follow").classList.toggle("show", !follow);
+});
+$("follow").onclick = () => { follow = true; text.scrollTop = text.scrollHeight; $("follow").classList.remove("show"); };
+$("show-partial").onchange = (e) => document.body.classList.toggle("hide-partial", !e.target.checked);
+$("copy").onclick = () => navigator.clipboard.writeText(finals.map((f) => f.el.textContent).join(" "));
+$("start").onclick = start;
+$("srt").onclick = () => { location.href = "result.srt"; };
+$("json").onclick = () => window.open("result.json");
+audio.addEventListener("play", start);
+
+(async () => {
+  const cfg = await fetch("config").then((r) => r.json());
+  if (RTL.includes(cfg.lang)) text.dir = "rtl";
+  text.lang = cfg.lang;
+  if (cfg.player) { audio.src = cfg.player; audio.hidden = false; }
+  else { $("no-player").hidden = false; $("start").hidden = false; }
+  setState(cfg.state);
+  // a stream already running (another tab started it): join it
+  if (cfg.state !== "idle") { started = true; $("start").disabled = true; listen(); }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

@@ -102,6 +102,31 @@
       [TASK-live-transcription.md](TASK-live-transcription.md). Источник — WebRTC через Janus, звук
       на воркер через `rtp_forward`. Сначала узнать: хост и версия Janus, плагин и комната, `admin_key`,
       проходит ли UDP Janus → GPU-хост; кто смотрит результат, задержка, GPU.
+- [x] Вариант 1 (Whisper + LocalAgreement): ядро и CLI `python -m ai_trns.live` (2026-10-21), тесты на фейковой модели.
+- [x] Сессии live в API (`/live`, SSE), движок воркера `live`, отдельный `ai-trns-live-worker`, страница `תמלול חי`
+      в ai-tools (2026-10-22). Тесты: 158 зелёных.
+- [x] Задеплоено 2026-10-22: ai-trns на `ai-tools` (`ai-trns-live-worker`), ai-tools `41845fb` → `/live`.
+- [x] Источник — HLS трансляции вместо WebRTC/Janus (2026-10-22): `https://edge3.uk.kab.tv/live/heb-medium/playlist.m3u8`,
+      в ai-tools — `REACT_APP_LIVE_STREAM_URL` (.env и Actions variables), в API `AI_TRNS_ALLOWED_URL_HOSTS` += `.kab.tv`
+      (точка в начале — любой поддомен). Проверено на трансляции: первый текст через ~3 с, проход 0.3 с,
+      текст отстаёт от звука на ~4–5 с. Слова делятся по тексту сегментов, не по токенам (faster-whisper клеит слова
+      на стыках сегментов).
+- [x] Трансляция — одна задача на всех (`POST /live` с тем же потоком возвращает идущую), «עצור» останавливает только
+      у последнего слушателя, без слушателей 60 с — задача заканчивается сама (2026-10-22).
+- [x] Google Docs (2026-10-22), каждый способ — только если настроен:
+      1) сервер на одном аккаунте (`AI_TRNS_GOOGLE_CREDENTIALS`: сервисный аккаунт или authorized_user,
+      `AI_TRNS_GOOGLE_FOLDER`, `AI_TRNS_GOOGLE_DOC_ROLE`) создаёт документ при создании live-задачи и дописывает в него;
+      2) браузер пишет в личный документ пользователя от его имени (ai-tools `REACT_APP_GOOGLE_CLIENT_ID`), список
+      личных документов с владельцами виден всем слушателям. Правки — в самих документах, автора хранит Google.
+- [ ] Настроить Google Cloud (`ai-tools-512410`) — по шагам со ссылками в [docs/GOOGLE-SETUP.md](docs/GOOGLE-SETUP.md):
+  - [x] OAuth client (`REACT_APP_GOOGLE_CLIENT_ID`) и API key для Picker (`REACT_APP_GOOGLE_API_KEY`) прописаны в ai-tools.
+  - [x] `privacy.html` и файл подтверждения Search Console (`googledec045341cd72249.html`) на сайте.
+  - [ ] Включены Docs / Drive / Picker API; scope только `drive.file`; Branding заполнен; Audience — Publish app.
+  - [ ] Окно выбора документа: «API key invalid» — проверить ограничения ключа (раздел 4).
+  - [ ] Search Console → Verify `https://ai-tools.kab.info/`, через 24 ч — снова проверка бренда.
+  - [ ] Запись с сервера: аккаунт (service account + папка на общем диске или authorized_user) → JSON на `ai-tools`,
+        `AI_TRNS_GOOGLE_*` в `ai-trns-api.env`.
+- [ ] Проверить страницу `/live` под пользователем (токен Keycloak, SSE через Angie, hls.js-плеер, Google Doc).
 
 ### Мелочи
 - [ ] `/health` показывает воркеры с PID в id до 5 мин после рестарта — задать `AI_TRNS_WORKER_ID` везде.
