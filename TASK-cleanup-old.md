@@ -126,4 +126,5 @@
     wav2vec2 + API (`api/`, `api.log`), сравнение текстов; последний коммит 2026-07-07. Сервиса нет.
   - `/home/stt-api-client` (+ `.bak-20261006`) — собранная статика старого клиента stt-api (`index.html`, `assets/`), отдавалась
     nginx на `sttapi.kli.one`; без stt-api не работает.
-- [x] Теперь на `stt`: `mdb-lora` (абзацы) — GPU свободна целиком.
+- [x] Теперь на `stt`: `mdb-lora` (абзацы) и сервис `ai-trns-paragraphs` на :8766 (4,3 ГБ при работе, выгружается в простое).
+- Образцы голоса Рава на `ai-tools`: 2 из stt-api + 1 новый (урок 30.11.24) — см. `TASK-speakers-paragraphs.md`.
