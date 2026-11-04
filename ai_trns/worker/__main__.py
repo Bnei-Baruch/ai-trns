@@ -70,12 +70,21 @@ class Models:
 
 
 def available_langs() -> list:
+    """Languages of the models here; with AI_TRNS_STT_URL also he, which the service transcribes"""
     if config.LANGS:
         return config.LANGS
-    if config.STT_URL:
-        return ["he"]
     langs = [lang for lang in ("he", "en", "ru") if os.path.isdir(os.path.join(config.MODELS_DIR, lang))]
+    if config.STT_URL and "he" not in langs:
+        langs.insert(0, "he")
     return langs + (["auto"] if "en" in langs else [])
+
+
+def by_service(job: dict) -> bool:
+    """With AI_TRNS_STT_URL, Hebrew URL jobs go to the service; uploads, other languages, diarize and live run
+    here (the service takes Hebrew media URLs only)"""
+    params = job["params"]
+    return bool(config.STT_URL) and params.get("kind") not in (DIARIZE, LIVE) and params["lang"] == "he" \
+        and "url" in job["source"]
 
 
 class Heartbeat:
@@ -245,7 +254,7 @@ def run_job(client: Client, models: Models, job: dict, shutdown: Optional[thread
         with Heartbeat(client, job_id) as beat:
             if params.get("kind") == LIVE:
                 doc = live(client, models, job, beat, shutdown)
-            elif config.STT_URL and params.get("kind") != DIARIZE:
+            elif by_service(job):
                 doc = transcribe_by_service(job, beat)
             else:
                 doc = run_locally(client, models, job, job_dir, beat)

@@ -151,3 +151,55 @@ def test_uploads_for_transcription_are_refused_when_off(client, api_config, audi
         r = client.post("/diarize/srt", headers=H, files={"audio": ("in.mp3", f),
                                                           "srt": ("in.srt", SRT.encode("utf-8"))})
     assert r.status_code == 202
+
+
+def test_uploads_and_other_languages_run_on_the_local_model(server, service, tmp_path, audio_file,  # noqa: F811
+                                                            monkeypatch):
+    """With AI_TRNS_STT_URL the service takes Hebrew URLs only; an upload or another language uses the model here"""
+    import httpx
+    from ai_trns.worker import __main__ as w
+    from ai_trns.worker import config
+    from tests.conftest import WORKER_KEY
+    from tests.test_worker import FakeTranscriber
+    monkeypatch.setattr(config, "API_URL", server)
+    monkeypatch.setattr(config, "WORKER_KEY", WORKER_KEY)
+    monkeypatch.setattr(config, "WORKER_ID", "mixed-worker")
+    monkeypatch.setattr(config, "STT_URL", service.url)
+    monkeypatch.setattr(config, "LANGS", [])
+    monkeypatch.setattr(config, "MODELS_DIR", str(tmp_path / "models"))
+    for lang in ("he", "en"):
+        (tmp_path / "models" / lang).mkdir(parents=True)
+    monkeypatch.setattr(config, "POLL_S", 0.1)
+    monkeypatch.setattr(config, "WORK_DIR", str(tmp_path / "work"))
+    used = []
+    fake = FakeTranscriber()
+    monkeypatch.setattr(w.Models, "get", lambda self, lang: used.append(lang) or fake)
+    assert w.available_langs() == ["he", "en", "auto"]
+    stop = threading.Event()
+    thread = threading.Thread(target=w.main, args=(stop,), daemon=True)
+    thread.start()
+    try:
+        with httpx.Client(base_url=server) as http:
+            with open(audio_file, "rb") as f:
+                upload = http.post("/jobs", headers=H, files={"file": ("in.mp3", f)}).json()["id"]
+            with open(audio_file, "rb") as f:
+                english = http.post("/jobs", headers=H, files={"file": ("in.mp3", f)}, data={"lang": "en"}).json()["id"]
+            hebrew = http.post("/jobs", headers=H, data={"url": MEDIA}).json()["id"]
+            for job_id in (upload, english, hebrew):
+                job = wait_status(http, job_id, ("done", "error"))
+                assert job["status"] == "done", job
+            assert http.get(f"/jobs/{hebrew}/result", headers=H).text == SRT
+    finally:
+        stop.set()
+        thread.join(timeout=10)
+    assert service.urls == [MEDIA]
+    assert used == ["he", "en"]
+
+
+def test_without_a_local_model_the_service_worker_takes_hebrew_only(tmp_path, monkeypatch):
+    from ai_trns.worker import __main__ as w
+    from ai_trns.worker import config
+    monkeypatch.setattr(config, "STT_URL", "http://stt.example")
+    monkeypatch.setattr(config, "LANGS", [])
+    monkeypatch.setattr(config, "MODELS_DIR", str(tmp_path))
+    assert w.available_langs() == ["he"]
