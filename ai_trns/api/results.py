@@ -45,7 +45,7 @@ STATS = {
     "diarize": ("speakers", "named", "split_cues", "mixed_cues", "vad_fallback_cues"),
 }
 # Inputs a job kind keeps in its dir, next to the uploaded audio
-TEXT, DOC, CUES = "text.txt", "doc.docx", "cues.json"
+TEXT, DOC, CUES, SOURCE = "text.txt", "doc.docx", "cues.json", "source.txt"
 # docdiff: shortest skipped passage that is highlighted; shorter gaps are mostly ASR noise
 MIN_REMOVED_WORDS = 5
 
@@ -140,7 +140,8 @@ def render(job_dir: str, params: dict, doc: dict, fmt: str,
             return json.dumps(doc, ensure_ascii=False), None
         if fmt == "paragraphs":
             from ..paragraphs.build import paragraphs
-            return json.dumps(paragraphs(doc), ensure_ascii=False), None
+            source = _read(job_dir, SOURCE) if os.path.exists(os.path.join(job_dir, SOURCE)) else None
+            return json.dumps(paragraphs(doc, source), ensure_ascii=False), None
         content, stats = labels.labeled_srt(json.loads(_read(job_dir, CUES)), doc)
         stats = {**stats, **{k: doc["stats"][k] for k in ("mixed_cues", "vad_fallback_cues") if k in doc["stats"]}}
         return (fix_rtl_srt(content) if fix_rtl and doc.get("language") == "he" else content), stats

@@ -1,10 +1,51 @@
-"""Diarization document (+ the model's paragraph starts) -> paragraphs. CPU only, stdlib only."""
+"""Diarization document (+ the model's paragraph starts, + the lesson's source text) -> paragraphs.
+CPU only, stdlib only."""
+import re
 from typing import Iterable, Optional
 
 from ..diarize import labels
 
 # The speaker whose turns the paragraphing model splits (the model learned on edited lesson texts of the Rav)
 MODEL_SPEAKER = "Rav"
+# A turn of someone else is the reader's (labels.NAMES: קריין) when this share of its words is in the lesson's
+# source text: in runs of READER_NGRAM words that the source has too
+READER = "Reader"
+READER_NGRAM = 4
+READER_SHARE = 0.5
+READER_MIN_WORDS = 8
+
+_NIQQUD_RE = re.compile(r"[\u0591-\u05C7]")
+_PUNCT_RE = re.compile(r"[^\w\u05D0-\u05EA]+")
+
+
+def norm(word: str) -> str:
+    """A word for comparing texts: no niqqud, no punctuation, lower case"""
+    return _PUNCT_RE.sub("", _NIQQUD_RE.sub("", word)).lower()
+
+
+def _keys(text: str) -> list[str]:
+    return [k for k in (norm(w) for w in text.split()) if k]
+
+
+def reader_turns(words: list[dict], turns: list[range], source: str) -> set[int]:
+    """Indices of the turns (not the Rav's) that read the source aloud"""
+    keys = _keys(source)
+    n = READER_NGRAM
+    grams = {tuple(keys[i:i + n]) for i in range(len(keys) - n + 1)}
+    out = set()
+    for t, turn in enumerate(turns):
+        if turn_speaker(words, turn) in (MODEL_SPEAKER, None):
+            continue
+        tk = [k for k in (norm(words[i]["word"]) for i in turn) if k]
+        if len(tk) < READER_MIN_WORDS:
+            continue
+        covered = [False] * len(tk)
+        for i in range(len(tk) - n + 1):
+            if tuple(tk[i:i + n]) in grams:
+                covered[i:i + n] = [True] * n
+        if sum(covered) / len(tk) >= READER_SHARE:
+            out.add(t)
+    return out
 
 
 def speaker_turns(words: list[dict]) -> list[range]:
@@ -64,15 +105,16 @@ def starts_from_sentences(index: list[int], offsets: list[int], sentences: list[
     return sorted(out)
 
 
-def paragraphs(doc: dict) -> dict:
-    """The "paragraphs" result of a diarize job"""
+def paragraphs(doc: dict, source: Optional[str] = None) -> dict:
+    """The "paragraphs" result of a diarize job; with the lesson's source text, turns reading it are the reader's"""
     labels.check(doc)
     words = doc["words"]
     model_starts = set(doc.get("paragraph_starts") or [])
     turns = speaker_turns(words)
+    readers = reader_turns(words, turns, source) if source else set()
     out = []
-    for turn in turns:
-        speaker = turn_speaker(words, turn)
+    for t, turn in enumerate(turns):
+        speaker = READER if t in readers else turn_speaker(words, turn)
         cuts = [i for i in turn if i in model_starts and i != turn.start]
         bounds = [turn.start, *cuts, turn.stop]
         for a, b in zip(bounds, bounds[1:]):
@@ -85,7 +127,8 @@ def paragraphs(doc: dict) -> dict:
                 "text": " ".join(" ".join(w["word"].split()) for w in ws if w["word"].strip()),
                 "words": [{"word": w["word"], "start": w["start"], "end": w["end"]} for w in ws],
             })
-    stats = {"paragraphs": len(out), "turns": len(turns), "model_breaks": len(out) - len(turns)}
+    stats = {"paragraphs": len(out), "turns": len(turns), "model_breaks": len(out) - len(turns),
+             "reader_turns": len(readers)}
     if (doc.get("stats") or {}).get("paragraphs_error"):
         stats["paragraphs_error"] = doc["stats"]["paragraphs_error"]
     return {"paragraphs": out, "stats": stats}

@@ -51,7 +51,7 @@ def test_paragraphs_split_at_speaker_changes_and_model_starts():
     assert [(p["label"], p["text"], p["start"], p["end"]) for p in result["paragraphs"]] == [
         ("רב", "שלום חברים.", 0.0, 1.5), ("רב", "היום נלמד.", 2.0, 3.5), ("תלמיד", "שאלה?", 4.0, 4.5),
         ("רב", "כן.", 5.0, 5.5), ("רב", "עוד משפט.", 6.0, 7.5)]
-    assert result["stats"] == {"paragraphs": 5, "turns": 3, "model_breaks": 2}
+    assert result["stats"] == {"paragraphs": 5, "turns": 3, "model_breaks": 2, "reader_turns": 0}
     assert result["paragraphs"][1]["words"] == [{"word": "היום", "start": 2.0, "end": 2.5},
                                                 {"word": "נלמד.", "start": 3.0, "end": 3.5}]
 
@@ -174,3 +174,68 @@ def test_a_diarize_job_with_paragraphs_end_to_end(server, worker, audio_file, se
 
 
 from tests.test_worker import server, worker  # noqa: E402,F401 (fixtures)
+
+
+def test_evaluate_against_an_edited_transcript():
+    from ai_trns.paragraphs import evaluate
+    text = ('כותרת השיעור\n\nקריין: קוראים בספר.\n"אור גדול." מאיר.\n\nשלום חברים. היום נלמד.\nעוד משפט.\n'
+            'שאלה: למה?\nכי כך.\n')
+    human = evaluate.human_words(text)
+    assert [(w["key"], w["label"]) for w in human][2:7] == [
+        ("קוראים", "קריין"), ("בספר", "קריין"), ("אור", "קריין"), ("גדול", "קריין"), ("מאיר", "קריין")]
+    words = lambda s, t0: [{"word": w, "start": t0 + i, "end": t0 + i + 0.5} for i, w in enumerate(s.split())]
+    result = {"paragraphs": [
+        {"label": "תלמיד", "words": words("קוראים בספר. אור גדול. מאיר.", 0)},
+        {"label": "רב", "words": words("שלום חברים. היום נלמד.", 10)},
+        {"label": "רב", "words": words("עוד משפט.", 20)},
+        {"label": "תלמיד", "words": words("למה?", 30)},
+        {"label": "רב", "words": words("כי כך.", 40)},
+    ]}
+    r = evaluate.evaluate(text, result)
+    assert r["speakers"]["רב"] == {"words": 8, "right": 1.0}
+    assert r["speakers"]["קריין"] == {"words": 5, "right": 0.0}
+    assert r["speakers"]["תלמיד"] == {"words": 1, "right": 1.0}
+    assert r["paragraphs_exact"] == {"p": 1.0, "r": 1.0, "f1": 1.0, "pred": 1, "gold": 1}
+    assert r["speaker_changes"] == {"missed": 0, "extra": 0, "both": 3}
+
+
+SOURCE = "ובזה תבין את דברי חז\"ל, שאמרו שהעולם נברא בשביל התורה והישראל."
+READING = [(w, "SPEAKER_02") for w in "אנחנו קוראים ובזה תבין את דברי חז\"ל, שאמרו שהעולם נברא בשביל התורה".split()]
+
+
+def test_a_turn_reading_the_source_is_the_readers():
+    doc = doc_of(READING + RAV + [(w, "SPEAKER_02") for w in "ומה זה אומר על הדרך שלנו היום בבקשה".split()])
+    result = build.paragraphs(doc, SOURCE)
+    assert [p["label"] for p in result["paragraphs"]] == ["קריין", "רב", "תלמיד"]
+    assert result["paragraphs"][0]["speaker"] == "Reader" and result["stats"]["reader_turns"] == 1
+    # without the source: a student
+    assert [p["label"] for p in build.paragraphs(doc)["paragraphs"]] == ["תלמיד", "רב", "תלמיד"]
+    # the Rav reading the source stays the Rav
+    rav_reads = doc_of([(w, "Rav") for w, _ in READING])
+    assert [p["label"] for p in build.paragraphs(rav_reads, SOURCE)["paragraphs"]] == ["רב"]
+
+
+def test_the_source_of_a_diarize_job_from_txt_or_docx(client, audio_file, tmp_path):
+    import io
+    import docx
+    from ai_trns.api import config
+    from tests.conftest import H
+    from tests.test_tools import SRT
+    d = docx.Document()
+    d.add_paragraph("כותרת")
+    d.add_paragraph(SOURCE)
+    buf = io.BytesIO()
+    d.save(buf)
+    for name, content in (("s.docx", buf.getvalue()), ("s.txt", SOURCE.encode())):
+        with open(audio_file, "rb") as f:
+            r = client.post("/diarize/words", headers=H, data={"paragraphs": "true"},
+                            files=[("audio", ("in.mp3", f)), ("srt", ("a.srt", SRT.encode())),
+                                   ("source", (name, content))])
+        assert r.status_code == 202, r.text
+        saved = (tmp_path / "jobs" / r.json()["id"] / "source.txt").read_text(encoding="utf-8")
+        assert SOURCE in saved
+    with open(audio_file, "rb") as f:
+        r = client.post("/diarize/words", headers=H, files=[("audio", ("in.mp3", f)), ("srt", ("a.srt", SRT.encode())),
+                                                            ("source", ("s.docx", b"not a docx"))])
+    assert r.status_code == 400
+    assert config.JOBS_DIR.startswith(str(tmp_path))

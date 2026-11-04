@@ -23,8 +23,27 @@ router = APIRouter(prefix="/diarize", tags=["diarize"])
 _EXT_RE = re.compile(r"^\.[a-z0-9]{1,5}$")
 
 
+def source_text(source: Optional[UploadFile]) -> Optional[bytes]:
+    """The lesson's source text (what the reader reads), from .txt (UTF-8) or .docx; None if not given"""
+    if source is None:
+        return None
+    content = source.file.read()
+    if (source.filename or "").lower().endswith(".docx"):
+        import io
+        import docx
+        try:
+            document = docx.Document(io.BytesIO(content))
+        except Exception:
+            raise HTTPException(400, "source: not a valid .docx")
+        return "\n".join(p.text for p in document.paragraphs).encode("utf-8")
+    try:
+        return content.decode("utf-8-sig").encode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(400, "source must be UTF-8 text or .docx")
+
+
 def _job(request: Request, who: Principal, fmt: str, audio, url, srt, samples, sample_names, lang, speakers,
-         paragraphs: bool = False):
+         paragraphs: bool = False, source: Optional[UploadFile] = None):
     try:
         cues = parse_srt(srt.file.read().decode("utf-8-sig"))
     except (UnicodeDecodeError, ValueError) as e:
@@ -42,6 +61,9 @@ def _job(request: Request, who: Principal, fmt: str, audio, url, srt, samples, s
               "samples": named, "speakers": {k: v for k, v in speakers.items() if v is not None},
               "paragraphs": paragraphs}
     inputs = {results.CUES: json.dumps(cues, ensure_ascii=False).encode("utf-8")}
+    text = source_text(source)
+    if text:
+        inputs[results.SOURCE] = text
     return job_view(store, store.get(create_job(store, who, params, audio, url, inputs, uploads)))
 
 
@@ -58,9 +80,9 @@ def diarize_srt(request: Request, who: Principal = Depends(principal),
                 samples: list[UploadFile] = File(default=[]), sample_names: list[str] = Form(default=[]),
                 num_speakers: Optional[int] = Form(None, ge=1), min_speakers: Optional[int] = Form(None, ge=1),
                 max_speakers: Optional[int] = Form(None, ge=1), lang: Literal["en", "he", "ru"] = Form("he"),
-                paragraphs: bool = Form(False)):
+                paragraphs: bool = Form(False), source: Optional[UploadFile] = File(None)):
     return _job(request, who, "srt", audio, url, srt, samples, sample_names, lang,
-                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs)
+                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs, source)
 
 
 # POST /diarize/words  same fields as /diarize/srt, the same job
@@ -71,15 +93,17 @@ def diarize_srt(request: Request, who: Principal = Depends(principal),
 #   paragraphs=true: the worker also splits the Rav's turns into paragraphs (the mdb-lora model, ai_trns.paragraphs);
 #   ?format=paragraphs: [{"speaker", "label", "start", "end", "text", "words"}] -- a new paragraph at every speaker
 #   change, inside the Rav's turns where the model puts one (without paragraphs=true: speaker turns only).
+#   source=<file> (.txt or .docx, optional): the lesson's source text; a turn of someone else that reads it is
+#   labeled קריין (the reader) in ?format=paragraphs.
 @router.post("/words", status_code=202)
 def diarize_words(request: Request, who: Principal = Depends(principal),
                   audio: Optional[UploadFile] = File(None), url: Optional[str] = Form(None), srt: UploadFile = File(...),
                   samples: list[UploadFile] = File(default=[]), sample_names: list[str] = Form(default=[]),
                   num_speakers: Optional[int] = Form(None, ge=1), min_speakers: Optional[int] = Form(None, ge=1),
                   max_speakers: Optional[int] = Form(None, ge=1), lang: Literal["en", "he", "ru"] = Form("he"),
-                  paragraphs: bool = Form(False)):
+                  paragraphs: bool = Form(False), source: Optional[UploadFile] = File(None)):
     return _job(request, who, "json", audio, url, srt, samples, sample_names, lang,
-                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs)
+                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs, source)
 
 
 class _Word(BaseModel):
