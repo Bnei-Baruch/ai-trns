@@ -203,3 +203,45 @@ def test_without_a_local_model_the_service_worker_takes_hebrew_only(tmp_path, mo
     monkeypatch.setattr(config, "LANGS", [])
     monkeypatch.setattr(config, "MODELS_DIR", str(tmp_path))
     assert w.available_langs() == ["he"]
+
+
+def test_an_unreachable_service_falls_back_to_the_local_model(server, tmp_path, audio_file, monkeypatch):  # noqa: F811
+    import socket
+    import httpx
+    from ai_trns.worker import __main__ as w
+    from ai_trns.worker import config
+    from tests.conftest import WORKER_KEY
+    from tests.test_worker import FakeTranscriber
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        dead = f"http://127.0.0.1:{s.getsockname()[1]}"
+    monkeypatch.setattr(config, "API_URL", server)
+    monkeypatch.setattr(config, "WORKER_KEY", WORKER_KEY)
+    monkeypatch.setattr(config, "WORKER_ID", "fallback-worker")
+    monkeypatch.setattr(config, "STT_URL", dead)
+    monkeypatch.setattr(config, "LANGS", [])
+    monkeypatch.setattr(config, "MODELS_DIR", str(tmp_path / "models"))
+    (tmp_path / "models" / "he").mkdir(parents=True)
+    monkeypatch.setattr(config, "POLL_S", 0.1)
+    monkeypatch.setattr(config, "WORK_DIR", str(tmp_path / "work"))
+    fake = FakeTranscriber()
+    monkeypatch.setattr(w.Models, "get", lambda self, lang: fake)
+    # the job's URL is served from a local file: the fallback reads the media itself
+    monkeypatch.setattr(w.audio, "get_duration", lambda source: 4.0)
+    monkeypatch.setattr(w.audio, "convert_to_wav",
+                        lambda source, wav, duration, progress, cancel: w.shutil.copy(audio_file, wav) or True)
+    stop = threading.Event()
+    thread = threading.Thread(target=w.main, args=(stop,), daemon=True)
+    thread.start()
+    try:
+        with httpx.Client(base_url=server) as http:
+            job_id = http.post("/jobs", headers=H, data={"url": MEDIA}).json()["id"]
+            job = wait_status(http, job_id, ("done", "error"))
+            assert job["status"] == "done", job
+            monkeypatch.setattr(config, "STT_FALLBACK", False)
+            job_id = http.post("/jobs", headers=H, data={"url": MEDIA}).json()["id"]
+            job = wait_status(http, job_id, ("done", "error"))
+            assert job["status"] == "error" and "STT service" in job["error"], job
+    finally:
+        stop.set()
+        thread.join(timeout=10)

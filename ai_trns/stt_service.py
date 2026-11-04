@@ -28,6 +28,10 @@ class Cancelled(Exception):
     """Raised when the job is cancelled while the service transcribes it"""
 
 
+class Unavailable(Exception):
+    """The service did not take the job (not reachable): nothing was started there"""
+
+
 def _get(url: str, timeout: float = 60):
     with urllib.request.urlopen(urllib.request.Request(url, headers={"Accept": "application/json"}),
                                 timeout=timeout) as response:
@@ -81,7 +85,11 @@ def transcribe(service_url: str, media_url: str, language: str = "he", timeout_s
         with urllib.request.urlopen(request, timeout=60) as response:
             job_url = urljoin(base, "." + response.headers["Location"])
     except urllib.error.HTTPError as e:
+        if e.code in (502, 503, 504):
+            raise Unavailable(f"STT service: {e.code}") from None
         raise RuntimeError(f"STT service: {e.code} {e.read().decode('utf-8', 'replace')[:300]}") from None
+    except (urllib.error.URLError, OSError) as e:
+        raise Unavailable(f"STT service: {getattr(e, 'reason', e)}") from None
     model = model_name(service_url)
 
     deadline = time.monotonic() + timeout_s

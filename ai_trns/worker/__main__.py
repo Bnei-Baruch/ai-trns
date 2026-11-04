@@ -195,6 +195,10 @@ def live(client: Client, models: Models, job: dict, beat: "Heartbeat",
                                transcriber.meta.get("boundary_correction_s"))
 
 
+class ServiceUnavailable(Exception):
+    """The STT service could not take the job; it may run on the local model instead"""
+
+
 def transcribe_by_service(job: dict, beat: "Heartbeat") -> Optional[dict]:
     """The transcribe engine with AI_TRNS_STT_URL: the service fetches the media itself"""
     from .. import stt_service
@@ -206,6 +210,13 @@ def transcribe_by_service(job: dict, beat: "Heartbeat") -> Optional[dict]:
     except stt_service.Cancelled:
         log.info("job %s cancelled", job["id"])
         return None
+    except stt_service.Unavailable as e:
+        raise ServiceUnavailable(str(e)) from None
+
+
+def can_fall_back(job: dict) -> bool:
+    """A local model for the job's language, and fallback allowed (AI_TRNS_STT_FALLBACK)"""
+    return config.STT_FALLBACK and os.path.isdir(os.path.join(config.MODELS_DIR, job["params"]["lang"]))
 
 
 def run_locally(client: Client, models: Models, job: dict, job_dir: str, beat: "Heartbeat") -> Optional[dict]:
@@ -255,7 +266,13 @@ def run_job(client: Client, models: Models, job: dict, shutdown: Optional[thread
             if params.get("kind") == LIVE:
                 doc = live(client, models, job, beat, shutdown)
             elif by_service(job):
-                doc = transcribe_by_service(job, beat)
+                try:
+                    doc = transcribe_by_service(job, beat)
+                except ServiceUnavailable as e:
+                    if not can_fall_back(job):
+                        raise
+                    log.warning("job %s: %s, transcribing on the local model", job_id, e)
+                    doc = run_locally(client, models, job, job_dir, beat)
             else:
                 doc = run_locally(client, models, job, job_dir, beat)
         if doc is None:

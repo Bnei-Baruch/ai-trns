@@ -23,6 +23,9 @@ HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
 # Transcribe Hebrew media URLs through whisper_trainer's job service at this URL (ai_trns.stt_service)
 # instead of a model here, e.g. http://10.66.1.53:8765. Uploads and other languages still use models/<lang>
 STT_URL = os.environ.get("AI_TRNS_STT_URL", "").rstrip("/")
+# The service not reachable (connection refused, 502-504 when the job is submitted): transcribe on models/<lang>
+# instead of failing the job. Its document then names the local model
+STT_FALLBACK = os.environ.get("AI_TRNS_STT_FALLBACK", "1").lower() in ("1", "true", "yes")
 STT_TIMEOUT_S = float(os.environ.get("AI_TRNS_STT_TIMEOUT_S", str(3 * 3600)))
 # Languages this worker takes jobs for; default: every models/<lang> present ("auto" needs models/en),
 # plus he with AI_TRNS_STT_URL
