@@ -85,3 +85,45 @@
       Actions variables — значения были: `msg.kab.info`, `https://ai-tools.kab.info/rest`, `…/rest/upload/file`, `https://demux.kab.sh`),
       пакеты `mqtt`, `rc-upload`; `whisper_fullfile_cli.py` в ai-trns.
 - **Каталог `/home/amnonbb/trns` (25 ГБ, домашний каталог другого человека) не удалён** — решить пользователю.
+
+### Diarize в ai-trns на `ai-tools` — сделано 2026-11-04
+- [x] Отдельный воркер `ai-trns-diarize-worker` (unit и env-пример в `scripts/`), свой venv `/home/ai-trns/env-diarize`
+      (torch 2.14.1+cu126 работает с драйвером 535; pyannote.audio 4.0.7, torchaudio 2.11), чтобы torch не попал в env live/transcribe.
+      `HF_TOKEN` взят из `stt:/home/stt-api/.env` (в `ai-trns-diarize-worker.env`, права 600). Образцы `Rav` → `/home/ai-trns/models/speakers`.
+- [x] Сверка со stt-api: урок `cdn.kabbalahmedia.info/3RhEpAgW` (78 мин, 855 реплик) — **5885/5885 слов с тем же спикером и
+      тем же началом** (статистика одинаковая: 18 спикеров, `Rav` найден). ai-trns на RTX 2080 — 172 с, stt-api на RTX 3070 — 122 с.
+- [x] Память GPU `ai-tools`: live 1,8 ГБ, transcribe 2,1 ГБ (модель грузится только для загрузок/других языков/фолбэка),
+      diarize 4,1 ГБ. Все трое разом — 7,94 из 8 ГБ → добавлен порог `AI_TRNS_MIN_FREE_GPU_MB`: воркер без загруженной модели
+      не берёт задачу, пока свободно меньше порога. diarize — 6200 (во время трансляции не стартует, ждёт), transcribe — 4000;
+      `IDLE_UNLOAD_S`: diarize 30, transcribe 60, live 60. Проверено: diarize во время live стоит в очереди, после — выполняется.
+- [x] Клиент: `api/stt.js` → `api/tools.js` (Speakers, Doc diff, Text diff — задачи ai-trns); страницы по-прежнему выключены в меню.
+      ai-tools PR #5 → `master`, задеплоено (run 41798758479). Из кода, `.env.example`, workflow и Actions variables убраны
+      `REACT_APP_STT_API` (`https://ai-tools.kab.info/stt-api`) и `REACT_APP_STT_URL` (`…/stt-api/stt/transcribe`).
+- **Найдено попутно:** сервис whisper_trainer `10.66.1.53:8765` 2026-11-04 отказывает в соединении (хост пингуется) → все URL-задачи
+  на иврите падали. Воркер теперь при недоступном сервисе распознаёт своей моделью (`AI_TRNS_STT_FALLBACK=1` по умолчанию).
+
+### Этап B — сделано 2026-11-04
+- [x] Данные review: в `stt:/home/stt-api/data/review` после переноса (20.10 ~17:50) нового нет (последние файлы — 20.10 17:15,
+      на `ai-tools` их более новые версии).
+- [x] Бэкап на `ai-tools:/root/backup-old-20261104/stt/` (права 600): `stt-api-and-units.tgz` (вся `/home/stt-api` с `.env` и
+      `data/`, unit'ы `stt-api.service` и `ai-trns.service`, `stt:/etc/nginx/conf.d/sttapi.conf`; 224 файла) и
+      `old-ai-trns-home.tar` (вся старая `/home/ai-trns`, 4,8 ГБ, 15856 файлов). Angie: `ngx.kab.info:/root/ai-tools.conf.bak.20261104102339`.
+- [x] Удалено на `stt`: `stt-api.service`, `ai-trns.service` (остановлены, disable, unit'ы удалены), каталоги `/home/stt-api`,
+      `/home/ai-trns`. Порты 8765/8766 свободны. **GPU `stt`: было 6855 МиБ занято, стало 1 МиБ** (свободно ~8 ГБ).
+- [x] Удалено в Angie: location `/stt-api/` (`angie -t`, reload). Сайт, `/ai-trns/health` — 200; задача по URL после удаления — done.
+- **Не тронуто (нет в списке задачи, решить пользователю):**
+  - Angie location `/whisper/` (прокси на whisper_trainer `10.66.1.53:8765` только для NAT `stt`, с ключом `X-STT-Key`) —
+    им пользовался только stt-api (21 запрос, последний 20.10). Теперь не нужен.
+  - `stt:/etc/nginx/conf.d/sttapi.conf` (`sttapi.kli.one`: статика `/home/stt-api-client` + `/api/` → :8765, теперь 502);
+    трафика с 20.10 нет.
+  - conda env `api` на `stt` (`/home/stt/miniconda3/envs/api`, окружение stt-api).
+  - `ai-tools:/home/amnonbb/trns` (25 ГБ; exec-api), модели en/ru оттуда уже скопированы.
+- Оставлены по задаче (что это):
+  - `/home/text_audio_align` (78 ГБ: `data` 27 ГБ, `output` 52 ГБ) — репозиторий `Bnei-Baruch/text_audio_align`: выравнивание
+    известного текста по длинной записи чтения (5–60 мин) → SRT по словам; может кормить `dataset_build` whisper_trainer.
+    Последний коммит 2026-07-16. Пригодится прототипу «пункт источника → момент урока» и метке `קריין`.
+  - `/home/wav2vec2-asr-pipeline` (12 ГБ, в основном `models/`) — репозиторий `Bnei-Baruch/wav2vec2-asr-pipeline`: своё ASR на
+    wav2vec2 + API (`api/`, `api.log`), сравнение текстов; последний коммит 2026-07-07. Сервиса нет.
+  - `/home/stt-api-client` (+ `.bak-20261006`) — собранная статика старого клиента stt-api (`index.html`, `assets/`), отдавалась
+    nginx на `sttapi.kli.one`; без stt-api не работает.
+- [x] Теперь на `stt`: `mdb-lora` (абзацы) — GPU свободна целиком.

@@ -11,7 +11,7 @@ ai-trns — сервис распознавания речи: аудио → с�
 
 ```
  клиенты                                   GPU-хосты
- (ai-tools, stt-api, скрипты)
+ (ai-tools, скрипты)
 
         │ HTTPS/HTTP                              
         ▼                                         
@@ -229,10 +229,10 @@ ai-trns/
 
 Из их схемы стоит взять: watchdog (900 с + 0.5 × длительность аудио) и переиспользование результата по хешу URL.
 
-**stt-api** (`~/projects/stt-api`, хост `stt`, сервис `stt-api.service`):
+**stt-api** (`~/projects/stt-api`, был на хосте `stt`; **удалён 2026-11-04**, бэкап — `TASK-cleanup-old.md`):
 - `/stt/*` — прокси на Whisper-сервис whisper_trainer (через Angie `/whisper/`). Больше не нужен: страница תמלול в ai-tools ходит прямо в `/jobs` ai-trns;
 - `/review/*` — перенесено в ai-trns (`ai_trns/api/review.py`), см. ниже;
-- `/diarize`, `/tadiff`, `/docdiff` — перенесено в ai-trns, см. ниже. В UI ai-tools выключены.
+- `/diarize`, `/tadiff`, `/docdiff` — перенесено в ai-trns, см. ниже. В UI ai-tools ходят в ai-trns, страницы выключены в меню.
 
 ### Виды задач: `/tadiff`, `/docdiff`, `/diarize`
 
@@ -290,13 +290,15 @@ Ubuntu 24.04, 12 ядер, 15 ГБ RAM, RTX 2080 8 ГБ (Turing), драйвер
 | Пользователь сервисов | `ai-trns` (системный, группы video/render) |
 | Код | `/home/ai-trns/app` (копия ветки `rest-api`, деплой через rsync) |
 | Окружение | `/home/ai-trns/env` (venv, Python 3.12) |
-| Модель | `/home/ai-trns/models/he` + `ai_trns_model.json` |
+| Модели | `/home/ai-trns/models/{he,en,ru}` (he + `ai_trns_model.json`; en, ru — из exec-api), образцы голоса `models/speakers/Rav` |
+| Окружение diarize | `/home/ai-trns/env-diarize` (venv: torch 2.14.1+cu126, pyannote.audio 4.0.7) |
 | Задачи и результаты | `/home/ai-trns/jobs/<id>/`, база `/home/ai-trns/jobs/jobs.sqlite` |
 | Временные файлы воркера | `/home/ai-trns/work` |
 | Настройки (ключи внутри, права 600) | `/home/ai-trns/ai-trns-api.env`, `/home/ai-trns/ai-trns-worker.env` |
 | API | systemd `ai-trns-api`, порт **8766** на всех интерфейсах |
-| Воркер | systemd `ai-trns-worker`, id `ai-tools-gpu0`, API по `http://127.0.0.1:8766` |
-| Логи | `journalctl -u ai-trns-api`, `journalctl -u ai-trns-worker` |
+| Воркеры | systemd `ai-trns-worker` (`ai-tools-gpu0`, transcribe), `ai-trns-live-worker` (`ai-tools-live0`, live), `ai-trns-diarize-worker` (`ai-tools-diarize0`, diarize); env-файлы рядом, API по `http://127.0.0.1:8766` |
+| Память GPU (8 ГБ) | live 1,8 ГБ, transcribe 2,1 ГБ, diarize 4,1 ГБ. `AI_TRNS_MIN_FREE_GPU_MB`: transcribe 4000, diarize 6200 — live всегда помещается, diarize во время трансляции ждёт |
+| Логи | `journalctl -u ai-trns-api -u ai-trns-worker -u ai-trns-live-worker -u ai-trns-diarize-worker` |
 
 Там же работает `ollama` (`bge-m3`) — тоже использует GPU, по запросу. exec-api (порт 8081, `/home/amnonbb/trns`)
 удалён 2026-11-04: страница Transcription в ai-tools ходит в `/jobs`; бэкап — `TASK-cleanup-old.md`.
@@ -313,9 +315,9 @@ Rocky Linux 9.5 (glibc 2.34), RTX 3070 8 ГБ, 15 ГБ RAM, CUDA 13.1.
 
 | Что | Где |
 |---|---|
-| Тестовая установка | `/home/ai-trns`: `env/`, `models/kabbalah-ct2` (+ симлинк `he`), `app/` (старая версия, всё в одном процессе), `bench/`, `run/` |
-| Тестовый сервис | systemd `ai-trns` (порт 8766), старая схема «API + GPU в одном процессе» |
-| stt-api | systemd `stt-api` (порт 8765), остановлен 2026-10-20 |
+| Модель абзацев | `/home/mdb-lora` (conda env `mdb-lora`, Qwen2.5-3B + LoRA `adapters/paragraphing/outputs/paragraphing`) |
+| Удалено 2026-11-04 | stt-api (`/home/stt-api`, порт 8765) и старый тестовый `ai-trns` (`/home/ai-trns`, порт 8766); бэкап на `ai-tools:/root/backup-old-20261104/stt/` |
+| Оставлено | `/home/text_audio_align`, `/home/wav2vec2-asr-pipeline`, `/home/stt-api-client` — см. `TASK-cleanup-old.md` |
 
 На этой ОС форк CTranslate2 из whisper_trainer не запускается: колесо требует glibc 2.38.
 

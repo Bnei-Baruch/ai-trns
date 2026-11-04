@@ -72,8 +72,7 @@
 
 ### Воркер на `stt`
 - [ ] Связь `stt → API`: открыть порт `stt → ai-tools`, или через Angie, или push от API.
-- [ ] Старый тестовый сервис `ai-trns` на `stt` (держит GPU) — остановить или обновить до воркера.
-- [x] stt-api снова запущен 2026-10-20 (по просьбе пользователя): GPU `stt` занят на 6.9 из 8 ГБ вместе со старым тестовым `ai-trns`.
+- [x] Старый тестовый `ai-trns` и stt-api на `stt` удалены (2026-11-04): GPU `stt` свободна (mdb-lora — абзацы).
 
 ### Из stt-api
 - [x] `/review/*` перенесён (`ai_trns/api/review.py`, ветка `review`): урок = задача ai-trns, рецензент из токена.
@@ -81,15 +80,15 @@
 - [x] `/stt/*`-прокси не нужен: תמלול вызывает `/jobs` напрямую.
 - [ ] Перенос данных: `stt:/home/stt-api/data/review` → `ai-tools:/home/ai-trns/review` (права `ai-trns`),
       задать `AI_TRNS_REVIEW_DIR` в `ai-trns-api.env`. Уроки `pending` без задачи станут `failed` — добавить заново.
-- [ ] ai-tools: `REACT_APP_AI_TRNS_API` в `.env` и в Actions variables; убрать `REACT_APP_STT_URL`.
+- [x] ai-tools: `REACT_APP_AI_TRNS_API` в `.env` и в Actions variables; `REACT_APP_STT_URL`, `REACT_APP_STT_API` убраны (2026-11-04).
 - [ ] Проверить вживую: добавить урок в Review, дождаться `ready`, сохранить результат, открыть отчёт.
 - [x] diarize / tadiff / docdiff перенесены (ветка `review`): запрос создаёт задачу, результат — `/jobs/{id}/result`.
       tadiff/docdiff — обычное распознавание + сравнение на API; diarize — движок воркера `diarize`.
       Движок проверен на `stt` против stt-api: урок 1:45 ч, вывод совпал слово в слово, 159 с на RTX 3070.
-- [ ] Развернуть diarize: на GPU-хосте `requirements-diarize.txt` (на `ai-tools` драйвер 535 → torch под CUDA 12),
-      `HF_TOKEN`, образцы голоса `stt:/home/stt-api/diarize/speakers/Rav` → `AI_TRNS_SPEAKERS_DIR`,
-      `AI_TRNS_WORKER_ENGINES=transcribe,diarize`. Хватит ли 8 ГБ рядом с exec-api и ollama.
-- [ ] ai-tools: если включать эти страницы — перейти на задачи (202 + опрос), поля запросов те же.
+- [x] Diarize развёрнут на `ai-tools` (2026-11-04): `ai-trns-diarize-worker`, venv `env-diarize` (torch cu126), совпал со
+      stt-api слово в слово на уроке 78 мин; порог памяти GPU `AI_TRNS_MIN_FREE_GPU_MB` — подробности в `TASK-cleanup-old.md`.
+- [x] ai-tools: Speakers / Doc diff / Text diff — на задачах ai-trns (202 + опрос), страницы пока выключены в меню.
+- [x] stt-api и старый тестовый ai-trns на `stt` удалены (2026-11-04), бэкап — `TASK-cleanup-old.md`.
 
 ### Live: потоковая транскрипция
 - [ ] Потоковая транскрипция трансляций (текст с задержкой в секунды). План, вопросы и шаги —
@@ -121,6 +120,10 @@
   - [ ] Запись с сервера: аккаунт (service account + папка на общем диске или authorized_user) → JSON на `ai-tools`,
         `AI_TRNS_GOOGLE_*` в `ai-trns-api.env`.
 - [ ] Проверить страницу `/live` под пользователем (токен Keycloak, SSE через Angie, hls.js-плеер, Google Doc).
+
+### Сервис whisper_trainer
+- [ ] `10.66.1.53:8765` 2026-11-04 отказывает в соединении (хост жив). Пока он лежит, воркер распознаёт своей моделью
+      (`AI_TRNS_STT_FALLBACK`), в документе — имя локальной модели. Сообщить владельцам whisper_trainer.
 
 ### Мелочи
 - [ ] `/health` показывает воркеры с PID в id до 5 мин после рестарта — задать `AI_TRNS_WORKER_ID` везде.
