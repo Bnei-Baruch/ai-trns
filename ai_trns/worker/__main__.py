@@ -159,10 +159,40 @@ def diarize(client: Client, models: Models, job: dict, job_dir: str, wav_file: s
     beat.update("loading_model", CONVERT_SHARE)
     diarizer = models.diarizer()
     beat.update("diarizing", CONVERT_SHARE)
-    return diarizer.diarize(
+    # with paragraphs, the last share of the progress is the paragraphing service
+    share = (1 - CONVERT_SHARE) * (0.85 if params.get("paragraphs") else 1.0)
+    doc = diarizer.diarize(
         wav_file, cues, samples, lang=params["lang"], speakers=params.get("speakers"),
-        on_progress=lambda p: beat.update("diarizing", CONVERT_SHARE + (1 - CONVERT_SHARE) * p),
+        on_progress=lambda p: beat.update("diarizing", CONVERT_SHARE + share * p),
         should_cancel=beat.cancelled.is_set)
+    if params.get("paragraphs"):
+        beat.update("paragraphs", CONVERT_SHARE + share)
+        add_paragraphs(doc)
+    return doc
+
+
+def add_paragraphs(doc: dict) -> None:
+    """The Rav's paragraph starts from the paragraphing service into the diarization document
+    (ai_trns.paragraphs); if the service cannot be used, the reason goes to its stats and the job still succeeds"""
+    from ..paragraphs import build, client
+    stats = doc.setdefault("stats", {})
+    if not config.PARAGRAPHS_URL:
+        stats["paragraphs_error"] = "no paragraphing service (AI_TRNS_PARAGRAPHS_URL)"
+        return
+    turns = build.speaker_turns(doc["words"])
+    text, index, offsets = build.model_text(doc["words"], turns)
+    if not text:
+        doc["paragraph_starts"] = []
+        return
+    try:
+        reply = client.split(config.PARAGRAPHS_URL, text, config.PARAGRAPHS_KEY)
+    except RuntimeError as e:
+        log.warning("paragraphs: %s", e)
+        stats["paragraphs_error"] = str(e)
+        return
+    doc["paragraph_starts"] = build.starts_from_sentences(index, offsets, reply["sentences"], reply["breaks"])
+    doc["paragraphs_model"] = "mdb-lora paragraphing"
+    log.info("paragraphs: %d breaks in %s s", len(doc["paragraph_starts"]), reply.get("seconds"))
 
 
 def live(client: Client, models: Models, job: dict, beat: "Heartbeat",

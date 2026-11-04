@@ -1,0 +1,15 @@
+[Unit]
+Description=ai-trns paragraphs service (mdb-lora paragraphing adapter, ai_trns.paragraphs.service)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=stt
+WorkingDirectory=/home/stt/ai-trns-paragraphs
+EnvironmentFile=/home/stt/ai-trns-paragraphs/paragraphs.env
+ExecStart=/home/stt/miniconda3/envs/mdb-lora/bin/python -m ai_trns.paragraphs.service
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

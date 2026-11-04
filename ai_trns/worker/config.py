@@ -20,6 +20,10 @@ ENGINES = _list("AI_TRNS_WORKER_ENGINES") or ["transcribe"]
 SPEAKERS_DIR = os.environ.get("AI_TRNS_SPEAKERS_DIR") or os.path.join(MODELS_DIR, "speakers")
 DIARIZE_PIPELINE = os.environ.get("AI_TRNS_DIARIZE_PIPELINE", "pyannote/speaker-diarization-community-1")
 HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
+# diarize jobs asked for paragraphs: the paragraphing service (ai_trns.paragraphs.service, mdb-lora on `stt`)
+# and its key; unset = speaker turns only
+PARAGRAPHS_URL = os.environ.get("AI_TRNS_PARAGRAPHS_URL", "").rstrip("/")
+PARAGRAPHS_KEY = os.environ.get("AI_TRNS_PARAGRAPHS_KEY", "")
 # Transcribe Hebrew media URLs through whisper_trainer's job service at this URL (ai_trns.stt_service)
 # instead of a model here, e.g. http://10.66.1.53:8765. Uploads and other languages still use models/<lang>
 STT_URL = os.environ.get("AI_TRNS_STT_URL", "").rstrip("/")

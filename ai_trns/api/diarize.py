@@ -23,7 +23,8 @@ router = APIRouter(prefix="/diarize", tags=["diarize"])
 _EXT_RE = re.compile(r"^\.[a-z0-9]{1,5}$")
 
 
-def _job(request: Request, who: Principal, fmt: str, audio, url, srt, samples, sample_names, lang, speakers):
+def _job(request: Request, who: Principal, fmt: str, audio, url, srt, samples, sample_names, lang, speakers,
+         paragraphs: bool = False):
     try:
         cues = parse_srt(srt.file.read().decode("utf-8-sig"))
     except (UnicodeDecodeError, ValueError) as e:
@@ -38,7 +39,8 @@ def _job(request: Request, who: Principal, fmt: str, audio, url, srt, samples, s
         named.append({"name": (sample_names[i] if sample_names else base).strip() or base, "file": file})
     store = request.app.state.store
     params = {"kind": KIND, "lang": lang, "formats": [fmt], "profile": None, "fix_rtl": False,
-              "samples": named, "speakers": {k: v for k, v in speakers.items() if v is not None}}
+              "samples": named, "speakers": {k: v for k, v in speakers.items() if v is not None},
+              "paragraphs": paragraphs}
     inputs = {results.CUES: json.dumps(cues, ensure_ascii=False).encode("utf-8")}
     return job_view(store, store.get(create_job(store, who, params, audio, url, inputs, uploads)))
 
@@ -55,9 +57,10 @@ def diarize_srt(request: Request, who: Principal = Depends(principal),
                 audio: Optional[UploadFile] = File(None), url: Optional[str] = Form(None), srt: UploadFile = File(...),
                 samples: list[UploadFile] = File(default=[]), sample_names: list[str] = Form(default=[]),
                 num_speakers: Optional[int] = Form(None, ge=1), min_speakers: Optional[int] = Form(None, ge=1),
-                max_speakers: Optional[int] = Form(None, ge=1), lang: Literal["en", "he", "ru"] = Form("he")):
+                max_speakers: Optional[int] = Form(None, ge=1), lang: Literal["en", "he", "ru"] = Form("he"),
+                paragraphs: bool = Form(False)):
     return _job(request, who, "srt", audio, url, srt, samples, sample_names, lang,
-                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers))
+                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs)
 
 
 # POST /diarize/words  same fields as /diarize/srt, the same job
@@ -65,14 +68,18 @@ def diarize_srt(request: Request, who: Principal = Depends(principal),
 #   {"words": [{"word", "start", "end", "speaker", "cue"}], "stats": {"speakers", "named", "mixed_cues",
 #    "vad_fallback_cues"}, ...}; every word timed by CTC forced alignment (VAD fallback per cue),
 #   cue = 0-based SRT cue index. ?format=srt: the labeled SRT.
+#   paragraphs=true: the worker also splits the Rav's turns into paragraphs (the mdb-lora model, ai_trns.paragraphs);
+#   ?format=paragraphs: [{"speaker", "label", "start", "end", "text", "words"}] -- a new paragraph at every speaker
+#   change, inside the Rav's turns where the model puts one (without paragraphs=true: speaker turns only).
 @router.post("/words", status_code=202)
 def diarize_words(request: Request, who: Principal = Depends(principal),
                   audio: Optional[UploadFile] = File(None), url: Optional[str] = Form(None), srt: UploadFile = File(...),
                   samples: list[UploadFile] = File(default=[]), sample_names: list[str] = Form(default=[]),
                   num_speakers: Optional[int] = Form(None, ge=1), min_speakers: Optional[int] = Form(None, ge=1),
-                  max_speakers: Optional[int] = Form(None, ge=1), lang: Literal["en", "he", "ru"] = Form("he")):
+                  max_speakers: Optional[int] = Form(None, ge=1), lang: Literal["en", "he", "ru"] = Form("he"),
+                  paragraphs: bool = Form(False)):
     return _job(request, who, "json", audio, url, srt, samples, sample_names, lang,
-                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers))
+                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs)
 
 
 class _Word(BaseModel):

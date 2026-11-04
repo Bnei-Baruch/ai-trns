@@ -5,13 +5,14 @@ What a job makes of its worker's document, by kind (ai_trns.api.jobs.kind_of). C
     transcribe  transcribe   -                        txt, srt, json
     tadiff      transcribe   text.txt                 diff, txt, srt, json
     docdiff     transcribe   doc.docx                 docx, diff, txt, srt, json
-    diarize     diarize      cues.json, sample<i>.*   srt, json
+    diarize     diarize      cues.json, sample<i>.*   srt, json, paragraphs
     live        live         -                        srt, txt, json
 
 json is always the worker's document as is: a words document (ai_trns.words) from the
 transcribe engine, a diarization document (ai_trns.diarize) from the diarize one.
 diff is the text <-> heard words diff (ai_trns.textdiff), docx the document with the passages
-skipped in the audio highlighted.
+skipped in the audio highlighted. paragraphs: speaker turns, the Rav's split by the paragraphing model
+(ai_trns.paragraphs.build), as JSON.
 """
 import io
 import json
@@ -28,12 +29,13 @@ from .jobs import kind_of
 
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 MEDIA_TYPES = {"txt": "text/plain; charset=utf-8", "srt": "application/x-subrip; charset=utf-8",
-               "json": "application/json", "diff": "application/json", "docx": DOCX}
+               "json": "application/json", "diff": "application/json", "docx": DOCX,
+               "paragraphs": "application/json"}
 FORMATS = {
     "transcribe": ("txt", "srt", "json"),
     "tadiff": ("diff", "txt", "srt", "json"),
     "docdiff": ("docx", "diff", "txt", "srt", "json"),
-    "diarize": ("srt", "json"),
+    "diarize": ("srt", "json", "paragraphs"),
     "live": ("srt", "txt", "json"),
 }
 # Counters a finished job keeps ("stats" in the job view, X-<Kind>-* headers of its result)
@@ -87,7 +89,9 @@ def download_name(job: dict, fmt: str) -> str:
     params = job["params"]
     if fmt == "docx" and params.get("doc_name"):
         return f"{os.path.splitext(params['doc_name'])[0]}_marked.docx"
-    return f"{job['id']}.diff.json" if fmt == "diff" else f"{job['id']}.{fmt}"
+    if fmt in ("diff", "paragraphs"):
+        return f"{job['id']}.{fmt}.json"
+    return f"{job['id']}.{fmt}"
 
 
 def _read(job_dir: str, name: str, mode: str = "r"):
@@ -134,6 +138,9 @@ def render(job_dir: str, params: dict, doc: dict, fmt: str,
         labels.check(doc)
         if fmt == "json":
             return json.dumps(doc, ensure_ascii=False), None
+        if fmt == "paragraphs":
+            from ..paragraphs.build import paragraphs
+            return json.dumps(paragraphs(doc), ensure_ascii=False), None
         content, stats = labels.labeled_srt(json.loads(_read(job_dir, CUES)), doc)
         stats = {**stats, **{k: doc["stats"][k] for k in ("mixed_cues", "vad_fallback_cues") if k in doc["stats"]}}
         return (fix_rtl_srt(content) if fix_rtl and doc.get("language") == "he" else content), stats
