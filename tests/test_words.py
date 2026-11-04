@@ -51,3 +51,13 @@ def test_every_format_renders_from_the_document():
     assert "\u202b" not in render({**doc, "language": "ru"}, "srt", fix_rtl=True)
     assert render(doc, "txt") == "שלום עולם. מה נשמע"
     assert json.loads(render(doc, "json")) == doc
+
+
+def test_decode_profiles_use_faster_whisper_parameter_names():
+    import inspect
+    from faster_whisper import WhisperModel
+    from ai_trns.transcriber import PROFILES
+    accepted = inspect.signature(WhisperModel.transcribe).parameters
+    for name, profile in PROFILES.items():
+        unknown = set(profile) - {"batched"} - set(accepted)
+        assert not unknown, (name, unknown)
