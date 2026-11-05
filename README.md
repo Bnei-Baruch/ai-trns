@@ -70,6 +70,9 @@ Each job records its `owner` (`user:<sub>` or `key:<name>`). With no issuer and 
 | `GET` | `/jobs/{id}/result?format=srt&fix_rtl=` | result; any format, also one not asked for, is rendered from the job's words |
 | `DELETE` | `/jobs/{id}` | cancel (a running job stops at the worker's next heartbeat) |
 | `POST` | `/render?format=srt&fix_rtl=` | words document (JSON body) → SRT / txt, no job, no GPU |
+| `POST` | `/markup` | form: `uid` (kmedia lesson), `language` (`he`), `force` → `202` + the run's state. The server chains a transcribe and a diarize job on the lesson's original audio and builds the lesson's chapters and its transcript's paragraphs on the time line (`ai_trns.markup`) |
+| `GET` | `/markup/{uid}` | the lesson's markup document, **no auth** (public lessons; `Access-Control-Allow-Origin: *`); 404 until a run is ready |
+| `GET` | `/markup/{uid}/status` | the last run: `pending` (`stage` transcribe / diarize) → `ready` / `failed`, no auth |
 | `GET` | `/health` | queue length, workers seen in the last 5 min and their jobs (no auth) |
 
 ```bash

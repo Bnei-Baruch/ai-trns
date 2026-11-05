@@ -56,5 +56,7 @@ GOOGLE_DOC_ROLE = os.environ.get("AI_TRNS_GOOGLE_DOC_ROLE", "")
 
 # Human review of STT (ai_trns.api.review): sets, lessons and results as JSON files
 REVIEW_DIR = os.environ.get("AI_TRNS_REVIEW_DIR", "./review")
+# lesson markup (ai_trns.api.markup): its runs and documents, kept without the jobs' TTL
+MARKUP_DIR = os.environ.get("AI_TRNS_MARKUP_DIR", "./markup")
 # The model reviewers are told they review; default: the model of the newest transcribed lesson
 REVIEW_MODEL = os.environ.get("AI_TRNS_REVIEW_MODEL", "")
