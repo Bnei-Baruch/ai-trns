@@ -51,7 +51,8 @@ def test_paragraphs_split_at_speaker_changes_and_model_starts():
     assert [(p["label"], p["text"], p["start"], p["end"]) for p in result["paragraphs"]] == [
         ("רב", "שלום חברים.", 0.0, 1.5), ("רב", "היום נלמד.", 2.0, 3.5), ("תלמיד", "שאלה?", 4.0, 4.5),
         ("רב", "כן.", 5.0, 5.5), ("רב", "עוד משפט.", 6.0, 7.5)]
-    assert result["stats"] == {"paragraphs": 5, "turns": 3, "model_breaks": 2, "reader_turns": 0}
+    assert result["stats"] == {"paragraphs": 5, "turns": 3, "model_breaks": 2, "reader_turns": 0,
+                               "reading_words": 0}
     assert result["paragraphs"][1]["words"] == [{"word": "היום", "start": 2.0, "end": 2.5},
                                                 {"word": "נלמד.", "start": 3.0, "end": 3.5}]
 
@@ -281,6 +282,42 @@ def test_the_source_of_a_diarize_job_from_txt_or_docx(client, audio_file, tmp_pa
                                                             ("source", ("s.docx", b"not a docx"))])
     assert r.status_code == 400
     assert config.JOBS_DIR.startswith(str(tmp_path))
+
+
+LONG_SOURCE = ("ובזה תבין את דברי חז\"ל שאמרו שהעולם נברא בשביל התורה והישראל ולכן צריכים להבין את המטרה הזו "
+               "ושכל הבריאה כולה אינה אלא כדי להביא את האדם לדבקות בבורא")
+
+
+def test_reading_is_told_apart_from_speaking_whoever_speaks():
+    read = LONG_SOURCE.split()[:20]
+    read[9:10] = ["אה", "בשביל"]  # an ASR slip inside the reading
+    announce = [(w, "SPEAKER_03") for w in "קטע מספר 2 נקרא עכשיו".split()]
+    reads = [(w, "SPEAKER_03") for w in read]
+    talks = [(w, "SPEAKER_03") for w in "ועכשיו שאלה מחבר מאיטליה בבקשה".split()]
+    doc = doc_of(announce + reads + talks + RAV + [(w, "Rav") for w in LONG_SOURCE.split()[4:20]] + RAV)
+    result = build.paragraphs(doc, LONG_SOURCE)
+    assert [(p["label"], p["reading"], len(p["words"])) for p in result["paragraphs"]] == [
+        ("קריין", False, 5), ("קריין", True, 21), ("קריין", False, 5),  # the reader announces, reads, talks
+        ("רב", False, 4), ("רב", True, 16), ("רב", False, 4)]          # the Rav reads too: still the Rav's
+    assert result["stats"]["reading_words"] == 37 and result["stats"]["model_breaks"] == 0
+    # a quote shorter than READING_MIN_WORDS is speech
+    assert not any(build.reading_words(doc_of([(w, "Rav") for w in LONG_SOURCE.split()[:11]])["words"], LONG_SOURCE))
+    # without the source, nothing is reading
+    assert not any(p["reading"] for p in build.paragraphs(doc)["paragraphs"])
+
+
+def test_the_evaluation_scores_reading_apart_from_speakers():
+    from ai_trns.paragraphs import evaluate
+    text = "תלמיד: כתוב " + LONG_SOURCE + "\nזה העיקר שם.\n"
+    words = lambda s, t0: [{"word": w, "start": t0 + i, "end": t0 + i + 0.5} for i, w in enumerate(s.split())]
+    result = {"paragraphs": [{"label": "תלמיד", "reading": False, "words": words("כתוב", 0)},
+                             {"label": "תלמיד", "reading": True, "words": words(LONG_SOURCE, 1)},
+                             {"label": "רב", "reading": False, "words": words("זה העיקר שם.", 40)}]}
+    r = evaluate.evaluate(text, result, source=LONG_SOURCE)
+    n = len(LONG_SOURCE.split())
+    assert r["speakers"]["תלמיד"] == {"words": n + 1, "right": 1.0}  # a student quoting the source: a student
+    assert r["reading"] == {"p": 1.0, "r": 1.0, "f1": 1.0, "tp": n, "pred": n, "gold": n}
+    assert evaluate.evaluate(text, result)["reading"] is None
 
 
 def test_the_reader_is_the_voice_that_announces_the_reading():

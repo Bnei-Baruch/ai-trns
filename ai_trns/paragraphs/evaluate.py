@@ -9,6 +9,8 @@ inside) are the reader's too; a shorter quote of the source inside the Rav's wor
 The transcript's words are aligned to the model's (difflib on normalized words); on the aligned words:
   - speakers: the share of words of each human label that got the same label from the model, the confusion,
     speaker changes missed / extra;
+  - reading: P/R/F1 of the words the model marks as read from the source against the editor's passages that read
+    it (anyone's lines: a student quoting it reads too);
   - paragraphs (inside the Rav's speech on both sides, a speaker change not counted): exact P/R/F1 of paragraph
     starts on the same word, tol1 -- within one sentence (as mdb-lora's eval.py).
 Run: python -m ai_trns.paragraphs.evaluate [--sources DIR] <lesson.doc.txt> <job result ?format=paragraphs> [...pairs]
@@ -36,8 +38,9 @@ _PREFIX_RE = re.compile(r"^\s*(" + "|".join(PREFIXES) + r")\s*:\s*")
 
 
 def human_words(text: str, source: Optional[str] = None) -> list[dict]:
-    """[{"key", "label", "para"}]: the transcript's words with the speaker of their line and the line number;
-    with the source text, the passages of the Rav's lines that read it -> the reader's (source_passages)"""
+    """[{"key", "label", "reading", "para"}]: the transcript's words with the speaker of their line and the line
+    number; with the source text, the passages of the Rav's lines that read it -> the reader's (source_passages),
+    and `reading`: the words in a passage read from the source, whoever's line it is (a student quoting it too)"""
     out, reading, para = [], False, 0
     for line in text.replace("\r\n", "\n").split("\n"):
         if not line.strip():
@@ -55,7 +58,12 @@ def human_words(text: str, source: Optional[str] = None) -> list[dict]:
         if keys:
             out += [{"key": k, "label": label, "para": para} for k in keys]
             para += 1
+    for w in out:
+        w["reading"] = False
     if source:
+        for passage in source_passages(out, source, any_label=True):
+            for i in passage:
+                out[i]["reading"] = True
         for passage in source_passages(out, source):
             for i in passage:
                 out[i]["label"] = READER
@@ -63,17 +71,19 @@ def human_words(text: str, source: Optional[str] = None) -> list[dict]:
 
 
 def source_passages(words: list[dict], source: str, min_words: int = SOURCE_MIN_WORDS,
-                    gap: int = SOURCE_GAP) -> list[range]:
-    """Runs of the Rav's words (human_words) that read the source: words in an n-gram the source has too
-    (build.source_covered), at most `gap` other words between two of them, the run at least `min_words` long"""
+                    gap: int = SOURCE_GAP, any_label: bool = False) -> list[range]:
+    """Runs of the Rav's words (human_words; any_label: anyone's) that read the source: words in an n-gram the
+    source has too (build.source_covered), at most `gap` other words between two of them, the run at least
+    `min_words` long"""
     covered = build.source_covered([w["key"] for w in words], build.source_grams(source))
+    ok = (lambda k: True) if any_label else (lambda k: words[k]["label"] == RAV)
     out, i, n = [], 0, len(words)
     while i < n:
-        if not (covered[i] and words[i]["label"] == RAV):
+        if not (covered[i] and ok(i)):
             i += 1
             continue
         last, j = i, i + 1
-        while j < n and words[j]["label"] == RAV and j - last <= gap + 1:
+        while j < n and ok(j) and j - last <= gap + 1:
             if covered[j]:
                 last = j
             j += 1
@@ -84,13 +94,14 @@ def source_passages(words: list[dict], source: str, min_words: int = SOURCE_MIN_
 
 
 def model_words(result: dict) -> list[dict]:
-    """[{"key", "label", "para", "sentence"}] from a ?format=paragraphs result"""
+    """[{"key", "label", "reading", "para", "sentence"}] from a ?format=paragraphs result"""
     out, sentence = [], 0
     for n, p in enumerate(result["paragraphs"]):
         for w in p["words"]:
             key = norm(w["word"])
             if key:
-                out.append({"key": key, "label": p["label"] or STUDENT, "para": n, "sentence": sentence})
+                out.append({"key": key, "label": p["label"] or STUDENT, "reading": bool(p.get("reading")),
+                            "para": n, "sentence": sentence})
             if re.search(r"[.!?…:]['\"”’»)]*$", w["word"].strip()):
                 sentence += 1
     return out
@@ -149,8 +160,12 @@ def evaluate(text: str, result: dict, pairs: Optional[list[tuple[int, int]]] = N
         if hit is not None:
             used.add(hit)
             tp_tol += 1
+    reading = Counter((human[a]["reading"], model[b].get("reading", False)) for a, b in pairs)
     return {
         "human_words": len(human), "model_words": len(model), "aligned": len(pairs),
+        # words read from the source (source given): the model's `reading` against the editor's passages
+        "reading": _prf(reading[(True, True)], reading[(True, True)] + reading[(False, True)],
+                        reading[(True, True)] + reading[(True, False)]) if source else None,
         "speakers": per_label,
         "confusion": {f"{h}->{m}": v for (h, m), v in sorted(confusion.items())},
         "speaker_changes": changes,

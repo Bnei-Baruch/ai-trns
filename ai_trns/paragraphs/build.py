@@ -19,6 +19,13 @@ READER_MIN_WORDS = 8
 READER_CUE_RE = re.compile(r"(קטע|קטעים) (מספר|מס)|נקרא (קטע|קטעים|בספר|מתוך)|אנחנו קוראים")
 QUESTION_RE = re.compile(r"שאלה|\?")
 READER_CUE_WORDS, QUESTION_WORDS = 20, 12
+# Reading the source aloud vs speaking, per word, whoever speaks (the reader also announces, relays questions,
+# talks; the Rav sometimes reads himself): runs of at least READING_MIN_WORDS words covered by the source's
+# READER_NGRAM-grams, up to READING_GAP other words inside (ASR errors in the read text; not across a speaker
+# change). Against the editor's
+# reading on 35 lessons (TASK-speakers-paragraphs.md, 2026-11-05): precision 0.99, recall 0.97
+READING_MIN_WORDS = 12
+READING_GAP = 12
 
 _NIQQUD_RE = re.compile(r"[\u0591-\u05C7]")
 _PUNCT_RE = re.compile(r"[^\w\u05D0-\u05EA]+")
@@ -45,6 +52,33 @@ def reader_turns(words: list[dict], turns: list[range], source: Optional[str]) -
     by_voice = {t for t, turn in others if turn_speaker(words, turn) in readers and len(turn) >= READER_MIN_WORDS
                 and not QUESTION_RE.search(_head(words, turn, QUESTION_WORDS))}
     return by_voice or (_source_turns(words, turns, source) if source else set())
+
+
+def reading_words(words: list[dict], source: Optional[str], min_words: int = READING_MIN_WORDS,
+                  gap: int = READING_GAP) -> list[bool]:
+    """Per word: is it inside a passage read from the source (runs of covered words, see READING_MIN_WORDS)"""
+    out = [False] * len(words)
+    if not source:
+        return out
+    index = [i for i, w in enumerate(words) if norm(w["word"])]
+    covered = source_covered([norm(words[i]["word"]) for i in index], source_grams(source))
+    k, n = 0, len(index)
+    while k < n:
+        if not covered[k]:
+            k += 1
+            continue
+        last, j = k, k + 1
+        while j < n and j - last <= gap + 1:
+            if covered[j]:
+                last = j
+            elif words[index[j]].get("speaker") not in (None, words[index[last]].get("speaker")):
+                break  # a gap doesn't go on into someone else's words
+            j += 1
+        if last + 1 - k >= min_words:
+            for i in range(index[k], index[last] + 1):
+                out[i] = True
+        k = last + 1
+    return out
 
 
 def source_grams(source: str, n: int = READER_NGRAM) -> set[tuple]:
@@ -155,29 +189,34 @@ def thin_starts(words: list[dict], starts: Iterable[int], min_words: int) -> lis
 
 
 def paragraphs(doc: dict, source: Optional[str] = None) -> dict:
-    """The "paragraphs" result of a diarize job; with the lesson's source text, turns reading it are the reader's"""
+    """The "paragraphs" result of a diarize job; with the lesson's source text, turns reading it are the reader's,
+    and every paragraph says if it reads the source (`reading`: a new paragraph where reading starts or stops)"""
     labels.check(doc)
     words = doc["words"]
     model_starts = set(doc.get("paragraph_starts") or [])
     turns = speaker_turns(words)
     readers = reader_turns(words, turns, source)
-    out = []
+    reading = reading_words(words, source)
+    out, model_breaks = [], 0
     for t, turn in enumerate(turns):
         speaker = READER if t in readers else turn_speaker(words, turn)
-        cuts = [i for i in turn if i in model_starts and i != turn.start]
-        bounds = [turn.start, *cuts, turn.stop]
+        cuts = {i for i in turn if i in model_starts and i != turn.start}
+        model_breaks += len(cuts)
+        cuts |= {i for i in turn if i != turn.start and reading[i] != reading[i - 1]}
+        bounds = [turn.start, *sorted(cuts), turn.stop]
         for a, b in zip(bounds, bounds[1:]):
             ws = words[a:b]
             out.append({
                 "speaker": speaker,
                 "label": labels.display_name(speaker) if speaker else None,
+                "reading": reading[a],
                 "start": ws[0]["start"],
                 "end": ws[-1]["end"],
                 "text": " ".join(" ".join(w["word"].split()) for w in ws if w["word"].strip()),
                 "words": [{"word": w["word"], "start": w["start"], "end": w["end"]} for w in ws],
             })
-    stats = {"paragraphs": len(out), "turns": len(turns), "model_breaks": len(out) - len(turns),
-             "reader_turns": len(readers)}
+    stats = {"paragraphs": len(out), "turns": len(turns), "model_breaks": model_breaks,
+             "reader_turns": len(readers), "reading_words": sum(reading)}
     if (doc.get("stats") or {}).get("paragraphs_error"):
         stats["paragraphs_error"] = doc["stats"]["paragraphs_error"]
     return {"paragraphs": out, "stats": stats}
