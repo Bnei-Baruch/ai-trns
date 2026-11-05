@@ -8,11 +8,11 @@
   опрос `GET /jobs/{id}` → `GET /jobs/{id}/result?format=srt`.
   Ссылка всегда на `https://cdn.kabbalahmedia.info/<file id>`.
 - **בדיקת תמלול** (`/review`): `/review/*` (набор `main`), сохранение результата — `PUT`.
-- Прод: клиент на `https://ai-tools.kab.info`, API — `https://ai-tools.kab.info/ai-trns`.
+- Прод: клиент на `https://<ai-tools>`, API — `https://<ai-tools>/ai-trns`.
   Локальная разработка: клиент на `http://localhost:3000` обращается к тому же API напрямую (CORS).
 
 ## Что не так сейчас (проверено снаружи, 2026-10-20)
-1. **На сервере старая версия.** В `https://ai-tools.kab.info/ai-trns/openapi.json` только `/health`, `/jobs*`,
+1. **На сервере старая версия.** В `https://<ai-tools>/ai-trns/openapi.json` только `/health`, `/jobs*`,
    `/render`, `/worker/*`. Нет `/review/*`, `/diarize/*`, `/tadiff/*`, `/docdiff/*` — всё это лежит в рабочем
    дереве незакоммиченным. Из-за этого не работает בדיקת תמלול.
 2. **`POST /jobs` с `url` → 422** (пользователь, страница השוואת תמלול, ссылка на `cdn.kabbalahmedia.info`).
@@ -29,7 +29,7 @@
 3. В env API на сервере проверить/выставить:
    ```
    AI_TRNS_ALLOWED_URL_HOSTS=cdn.kabbalahmedia.info
-   AI_TRNS_CORS_ORIGINS=https://ai-tools.kab.info,http://localhost:3000
+   AI_TRNS_CORS_ORIGINS=https://<ai-tools>,http://localhost:3000
    AI_TRNS_REVIEW_DIR=/home/ai-trns/review
    ```
    Если в stt-api (`stt`, `data/review`) остались наборы/результаты проверки — перенести в `AI_TRNS_REVIEW_DIR`
@@ -47,7 +47,7 @@
 ## Не делать
 - Не делать `/tadiff`, `/docdiff`, `/diarize` синхронными ради старого клиента: страницы Speakers / Doc diff /
   Text diff в ai-tools сейчас выключены и будут переведены на задачи (202 + опрос) на стороне клиента.
-- `https://ai-tools.kab.info/ai_trns` (с подчёркиванием) отдаёт `index.html` клиента — это нормально,
+- `https://<ai-tools>/ai_trns` (с подчёркиванием) отдаёт `index.html` клиента — это нормально,
   правильный адрес `/ai-trns`, алиас не нужен.
 
 ## Отчёт

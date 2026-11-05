@@ -200,7 +200,7 @@ ai-trns/
 | Сервис / скрипт | `X-API-Key: <ключ>` или `Bearer <ключ>`. Ключи именованные: `AI_TRNS_API_KEYS=name:key,...` | Все задачи |
 | GPU-воркер | `X-Worker-Key` + `X-Worker-Protocol` | Только `/worker/*` |
 
-У задачи записывается владелец: `user:<sub>` или `key:<name>`. CORS открыт для `https://ai-tools.kab.info`.
+У задачи записывается владелец: `user:<sub>` или `key:<name>`. CORS открыт для `https://<ai-tools>`.
 
 ## 8. Связь с whisper_trainer и stt-api
 
@@ -314,8 +314,9 @@ Ubuntu 24.04, 12 ядер, 15 ГБ RAM, RTX 2080 8 ГБ (Turing), драйвер
 Деплой: GitHub Actions → CI/CD → Run workflow (ветка на выбор; `.github/workflows/ci-cd.yml`): тесты, копия кода
 (`git archive`) в `/home/ai-trns/app`, рестарт API и воркеров, проверка `/health`. Пока идёт задача (трансляция тоже) —
 отказ, если не отмечено `force`. Бэкап — `app.bak.ci.<время>`, хранятся 5 последних; коммит — в `app/DEPLOYED`.
-Пакеты Python (requirements*.txt) деплой не ставит. SSH через `ngx.kab.info`: ключ `DEPLOY_SSH_KEY` (секрет репо) на ngx
-только для прохода к `10.66.24.55:22` (`command=nologin`, `permitopen`), на ai-tools — root с `from="10.77.1.211"`.
+Пакеты Python (requirements*.txt) деплой не ставит. SSH — через промежуточный хост; хосты, их ключи (known_hosts) и
+ключ деплоя — секреты репо `DEPLOY_HOST`, `DEPLOY_JUMP_HOST`, `DEPLOY_KNOWN_HOSTS`, `DEPLOY_SSH_KEY`. На промежуточном
+хосте ключ только для прохода к SSH сервера (`command=nologin`, `permitopen`), на сервере — root только с него (`from=`).
 Вручную, как раньше:
 ```bash
 rsync -a --delete --exclude .git --exclude __pycache__ ./ root@10.66.24.55:/home/ai-trns/app/
@@ -340,8 +341,8 @@ Rocky Linux 9.5 (glibc 2.34), RTX 3070 8 ГБ, 15 ГБ RAM, CUDA 13.1.
 | Направление | Статус |
 |---|---|
 | `ai-tools` → `stt` | открыто (22, 8766 — сервис абзацев) |
-| `stt` → `ai-tools` | **закрыто полностью**, только через Angie (`https://ai-tools.kab.info/...`) |
-| Браузер → API | через Angie: `https://ai-tools.kab.info/ai-trns/` |
+| `stt` → `ai-tools` | **закрыто полностью**, только через Angie (`https://<ai-tools>/...`) |
+| Браузер → API | через Angie: `https://<ai-tools>/ai-trns/` |
 
 Поэтому воркер на `stt` пока не может забирать задачи у API на `ai-tools`. Варианты:
 - открыть один порт `stt → ai-tools`;

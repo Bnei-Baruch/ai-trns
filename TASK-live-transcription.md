@@ -114,7 +114,7 @@ Janus ──(RTP Opus, UDP → host:port воркера)──▶ ffmpeg -protoc
 - [x] Страница `תמלול חי` (`/live`, `src/pages/Live.tsx`, ветка `feature/transcript-compare`): ссылка на урок или файл →
       `POST /live` → плеер стартует по событию `start`; текст готовый / серым черновик, подсветка слова по плееру,
       клик — перемотка, стоп, SRT/TXT в конце. `keepAlive`: переключение инструментов трансляцию не обрывает.
-- [x] ai-tools задеплоен (`41845fb`, workflow `ci-cd.yml`, 2026-10-22): `https://ai-tools.kab.info/live`.
+- [x] ai-tools задеплоен (`41845fb`, workflow `ci-cd.yml`, 2026-10-22): `https://<ai-tools>/live`.
 - [ ] Проверить страницу под пользователем (токен Keycloak, SSE через Angie) и качество на уроке, где речь с начала.
 
 ## Ограничения и риски

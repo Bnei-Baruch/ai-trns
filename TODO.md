@@ -25,7 +25,7 @@
       в очередь, после 3 попыток — `error`. Отмена доходит через heartbeat. Модель выгружается после 5 мин простоя.
 - [x] Авторизация: пользователи — токены Keycloak (realm `main`, клиент `ai-tools`, роль `bb_user`), сервисы —
       именованные ключи, воркеры — свой ключ. Владелец у задачи, пользователь видит только свои. `GET /jobs`.
-      CORS для `https://ai-tools.kab.info`.
+      CORS для `https://<ai-tools>`.
 - [x] Тесты (38): реплики (перенесены из whisper_trainer), слова, API, протокол воркера, аренда, отмена,
       авторизация, настоящий воркер против настоящего API-сервера.
 
@@ -44,10 +44,10 @@
 ## Дальше
 
 ### Запуск для пользователей
-- [x] Angie на `ngx.kab.info`: location `https://ai-tools.kab.info/ai-trns/` → `10.66.24.55:8766`
+- [x] Angie на `ngx.kab.info`: location `https://<ai-tools>/ai-trns/` → `10.66.24.55:8766`
       (2026-10-20, бэкап `/root/ai-tools.conf.bak.20261020152425`). `/health` отвечает, `/jobs` без токена — 401.
 - [x] Задеплоен `b297acc` (ветка `review`) в `ai-tools:/home/ai-trns/app` (2026-10-20): `/review`, `/diarize`, `/tadiff`,
-      `/docdiff` в openapi; CORS `https://ai-tools.kab.info,http://localhost:3000` с `PUT`; `AI_TRNS_REVIEW_DIR=/home/ai-trns/review`;
+      `/docdiff` в openapi; CORS `https://<ai-tools>,http://localhost:3000` с `PUT`; `AI_TRNS_REVIEW_DIR=/home/ai-trns/review`;
       python-docx в env. Задача по URL `cdn.kabbalahmedia.info` → done → SRT. exec-api (`/home/amnonbb/trns`, master) не тронут.
 - [x] Данные review из `stt:/home/stt-api/data/review` перенесены в `ai-tools:/home/ai-trns/review` (2026-10-20, без
       перезаписи: `main/KB74kOBz` оставлен новый, от whisper_trainer; бэкап `review.bak.*`).
@@ -116,7 +116,7 @@
   - [x] `privacy.html` и файл подтверждения Search Console (`googledec045341cd72249.html`) на сайте.
   - [ ] Включены Docs / Drive / Picker API; scope только `drive.file`; Branding заполнен; Audience — Publish app.
   - [ ] Окно выбора документа: «API key invalid» — проверить ограничения ключа (раздел 4).
-  - [ ] Search Console → Verify `https://ai-tools.kab.info/`, через 24 ч — снова проверка бренда.
+  - [ ] Search Console → Verify `https://<ai-tools>/`, через 24 ч — снова проверка бренда.
   - [ ] Запись с сервера: аккаунт (service account + папка на общем диске или authorized_user) → JSON на `ai-tools`,
         `AI_TRNS_GOOGLE_*` в `ai-trns-api.env`.
 - [ ] Проверить страницу `/live` под пользователем (токен Keycloak, SSE через Angie, hls.js-плеер, Google Doc).

@@ -17,7 +17,7 @@
 | `stt` | `ai-trns.service` — старый тестовый `ai_trns.server` (:8766, 2,2 ГБ GPU), старая `/home/ai-trns` | живой |
 | `stt` | `/home/stt-api-client*`, `/home/text_audio_align`, `/home/wav2vec2-asr-pipeline` | проверить, не нужны ли (`text_audio_align` — выравнивание текста по аудио, может понадобиться прототипу фрагментов) |
 | `ai-tools` | `exec-api.service` (порт 8081, `/home/amnonbb/trns`), `whisper_fullfile_cli.py` в ai-trns | живой |
-| Angie `ngx.kab.info` | locations для exec-api (`/rest/`…) и stt-api (`https://ai-tools.kab.info/stt-api/…`) | найти в конфиге |
+| Angie `ngx.kab.info` | locations для exec-api (`/rest/`…) и stt-api (`https://<ai-tools>/stt-api/…`) | найти в конфиге |
 | клиент `../ai-tools` | `src/api/exec.js`, `src/api/mqtt.js`, `STT_URL`/`REACT_APP_STT_URL`, `EXEC_API`, `MQTT_URL` | используются в `pages/Transcription.jsx`, `pages/Speakers.jsx`, `api/transcribe.ts`, `api/UserManager.js` |
 
 ## Условия до удаления (иначе сломаем живые страницы)
@@ -61,7 +61,7 @@
 ### Логи Angie (2026-11-04, `ngx.kab.info:/var/log/angie/access.log*`, 20.10–04.11; хоста в формате лога нет — location `/rest/`, `/stt-api/`, `/whisper/` есть только в `conf.d/ai-tools.conf`)
 | location | Запросов | Кто |
 |---|---|---|
-| `/rest/` (exec-api) | 52 | реальные — только страница `https://ai-tools.kab.info/transcription` (20.10, 21.10 — пользователь; **23.10 — другой пользователь, 176.229.114.205, загрузка файла**); остальное — сканеры (404) |
+| `/rest/` (exec-api) | 52 | реальные — только страница `https://<ai-tools>/transcription` (20.10, 21.10 — пользователь; **23.10 — другой пользователь, 176.229.114.205, загрузка файла**); остальное — сканеры (404) |
 | `/stt-api/` | 65 | только ai-tools (`/review`, `/stt`) и `localhost:3000/3123` (разработка); последний — 20.10 |
 | `/whisper/` | 21 | только stt-api с `stt` (84.108.114.101 = NAT `stt`); последний — 20.10 |
 Чужих потребителей нет.
@@ -82,7 +82,7 @@
       Angie: `ngx.kab.info:/root/ai-tools.conf.bak.20261104095453`.
 - [x] Удалено: `exec-api.service` (остановлен, disable, unit удалён; порт 8081 свободен); location `/rest/` в Angie (`angie -t`, reload);
       в клиенте `exec.js`, `mqtt.js`, `MQTT_URL`/`EXEC_API`/`AI_BACKEND`/`WEB_URL` (код, `.env`, `.env.example`, workflow,
-      Actions variables — значения были: `msg.kab.info`, `https://ai-tools.kab.info/rest`, `…/rest/upload/file`, `https://demux.kab.sh`),
+      Actions variables — значения были: `msg.kab.info`, `https://<ai-tools>/rest`, `…/rest/upload/file`, `https://demux.kab.sh`),
       пакеты `mqtt`, `rc-upload`; `whisper_fullfile_cli.py` в ai-trns.
 - **Каталог `/home/amnonbb/trns` (25 ГБ, домашний каталог другого человека) не удалён** — решить пользователю.
 
@@ -98,7 +98,7 @@
       `IDLE_UNLOAD_S`: diarize 30, transcribe 60, live 60. Проверено: diarize во время live стоит в очереди, после — выполняется.
 - [x] Клиент: `api/stt.js` → `api/tools.js` (Speakers, Doc diff, Text diff — задачи ai-trns); страницы по-прежнему выключены в меню.
       ai-tools PR #5 → `master`, задеплоено (run 41798758479). Из кода, `.env.example`, workflow и Actions variables убраны
-      `REACT_APP_STT_API` (`https://ai-tools.kab.info/stt-api`) и `REACT_APP_STT_URL` (`…/stt-api/stt/transcribe`).
+      `REACT_APP_STT_API` (`https://<ai-tools>/stt-api`) и `REACT_APP_STT_URL` (`…/stt-api/stt/transcribe`).
 - **Найдено попутно:** сервис whisper_trainer `10.66.1.53:8765` 2026-11-04 отказывает в соединении (хост пингуется) → все URL-задачи
   на иврите падали. Воркер теперь при недоступном сервисе распознаёт своей моделью (`AI_TRNS_STT_FALLBACK=1` по умолчанию).
 

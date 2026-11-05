@@ -1,9 +1,10 @@
 name: CI/CD
 
 # CI: every push and pull request runs the tests (pytest, with ffmpeg; no GPU: fake models).
-# CD: only a manual run (Actions -> CI/CD -> Run workflow, any branch) deploys that commit to the ai-tools host
-# (10.66.24.55, /home/ai-trns/app) and restarts the API and the workers -- docs/ARCHITECTURE.md, "Деплой".
-# The host is on the internal network: SSH goes through ngx.kab.info (a jump-only key there).
+# CD: only a manual run (Actions -> CI/CD -> Run workflow, any branch) deploys that commit to the API / GPU host
+# (/home/ai-trns/app) and restarts the API and the workers -- docs/ARCHITECTURE.md, "Деплой".
+# The host is on an internal network: SSH goes through a jump host. Both come from the repo's secrets:
+# DEPLOY_HOST, DEPLOY_JUMP_HOST, DEPLOY_KNOWN_HOSTS (ssh-keyscan lines of both), DEPLOY_SSH_KEY.
 # Python packages are not installed by the deploy: a change of requirements*.txt is installed by hand.
 on:
   push:
@@ -43,35 +44,28 @@ jobs:
       group: deploy
       cancel-in-progress: false
     env:
-      HOST: root@10.66.24.55
+      HOST: deploy
       APP: /home/ai-trns/app
       SERVICES: ai-trns-api ai-trns-worker ai-trns-diarize-worker ai-trns-live-worker
     steps:
       - uses: actions/checkout@v7
 
       - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          JUMP_HOST: ${{ secrets.DEPLOY_JUMP_HOST }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_deploy
-          # ssh-keyscan ngx.kab.info; ssh-keyscan 10.66.24.55 (from ngx)
-          cat >> ~/.ssh/known_hosts <<'EOF'
-          ngx.kab.info ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDWoETL4o1h0Jfy8Iotq0FMHCEeOICgr4IHAFbACQSro
-          ngx.kab.info ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMF7krGEChzELXEpRLepaIsMEPftKWFx9JtuwPwiVnu5SqSX1Ra9kdDmxx3V74fJj6wgdJGJV8jYcxN1MDYb+ss=
-          10.66.24.55 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBcAKlu0NldMvRsw8ORQosGOgYqplrdbdkCMJ1EDtB/j
-          10.66.24.55 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAA5QEmxjuUo2HFiCuWMQvu7fX3mvuzeQ98GhXXy3iqVFVjK5PRFrD64reVLEBa5Z4MvCXkWquizTGfbxJlN/3E=
-          EOF
-          cat > ~/.ssh/config <<'EOF'
-          Host ngx.kab.info
-            User root
-            IdentityFile ~/.ssh/id_deploy
-            IdentitiesOnly yes
-          Host 10.66.24.55
-            User root
-            IdentityFile ~/.ssh/id_deploy
-            IdentitiesOnly yes
-            ProxyJump ngx.kab.info
-          EOF
+          printf '%s\n' \
+            "Host jump" "  HostName $JUMP_HOST" "  User root" "  IdentityFile ~/.ssh/id_deploy" "  IdentitiesOnly yes" \
+            "  LogLevel ERROR" \
+            "Host deploy" "  HostName $DEPLOY_HOST" "  User root" "  IdentityFile ~/.ssh/id_deploy" "  IdentitiesOnly yes" \
+            "  ProxyJump jump" "  LogLevel ERROR" > ~/.ssh/config
 
       - name: No job running
         if: ${{ !inputs.force }}

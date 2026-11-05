@@ -1,6 +1,6 @@
 # Google Cloud: настройка записи live-текста в Google Docs
 
-Страница `תמלול חי` (`https://ai-tools.kab.info/live`) пишет текст трансляции в Google Docs двумя способами:
+Страница `תמלול חי` (`https://<ai-tools>/live`) пишет текст трансляции в Google Docs двумя способами:
 
 1. **Из браузера, от имени пользователя** — в его личный документ. Нужен OAuth client и API key (ниже, разделы 1–6).
 2. **С сервера, на одном аккаунте** — ai-trns сам создаёт документ трансляции. Нужен аккаунт сервера (раздел 7).
@@ -32,8 +32,8 @@
 | User support email | адрес поддержки (он же контакт в политике конфиденциальности) |
 | Developer contact | e-mail для писем от Google |
 | App logo | не загружать без нужды: логотип требует проверки бренда |
-| Application home page | `https://ai-tools.kab.info` |
-| Privacy policy | `https://ai-tools.kab.info/privacy.html` (лежит в `ai-tools/public/privacy.html`) |
+| Application home page | `https://<ai-tools>` |
+| Privacy policy | `https://<ai-tools>/privacy.html` (лежит в `ai-tools/public/privacy.html`) |
 | Authorised domains | `kab.info` |
 
 **Data Access (scopes)** — https://console.cloud.google.com/auth/scopes?project=ai-tools-512410
@@ -50,7 +50,7 @@
 https://console.cloud.google.com/auth/clients?project=ai-tools-512410
 
 - Тип **Web application**, клиент `305720010110-8q0k0gruc6dg8o1dniv5t0vc92hvdlre.apps.googleusercontent.com`.
-- **Authorized JavaScript origins:** `https://ai-tools.kab.info`, `http://localhost:3000`.
+- **Authorized JavaScript origins:** `https://<ai-tools>`, `http://localhost:3000`.
 - Redirect URIs — пусто. Client secret не нужен.
 - В ai-tools: `REACT_APP_GOOGLE_CLIENT_ID` (Actions variable + `.env`).
 
@@ -58,7 +58,7 @@ https://console.cloud.google.com/auth/clients?project=ai-tools-512410
 
 https://console.cloud.google.com/apis/credentials?project=ai-tools-512410 → ключ → Edit
 
-- **Application restrictions:** Websites → `https://ai-tools.kab.info/*`, `http://localhost:3000/*`.
+- **Application restrictions:** Websites → `https://<ai-tools>/*`, `http://localhost:3000/*`.
 - **API restrictions:** Google Picker API (Docs и Drive в списке не мешают).
 - В ai-tools: `REACT_APP_GOOGLE_API_KEY` (Actions variable + `.env`). Ключ виден в коде страницы — это нормально,
   его защищают ограничения.
@@ -67,7 +67,7 @@ https://console.cloud.google.com/apis/credentials?project=ai-tools-512410 → к
 
 ## 5. Подтверждение сайта и проверка бренда (только чтобы показывать своё название/логотип)
 
-1. https://search.google.com/search-console → Add property → **URL prefix** `https://ai-tools.kab.info/` →
+1. https://search.google.com/search-console → Add property → **URL prefix** `https://<ai-tools>/` →
    HTML file. Файл `googledec045341cd72249.html` уже лежит в `ai-tools/public/` и отдаётся сайтом — **не удалять**.
 2. Verify в Search Console (тем же Google-аккаунтом, что владеет проектом).
 3. Через 24 часа снова отправить на проверку: Branding / Verification Center.
