@@ -17,7 +17,7 @@ import threading
 import time
 from typing import Optional
 
-from .. import audio, protocol
+from .. import audio, clip, protocol
 from . import config
 from .client import ApiError, Client
 
@@ -143,14 +143,18 @@ class Heartbeat:
             self.stopped.wait(protocol.HEARTBEAT_S)
 
 
-def diarize(client: Client, models: Models, job: dict, job_dir: str, wav_file: str, beat: "Heartbeat") -> dict:
-    """The diarize engine: the job's cues and voice samples come from the API next to its audio"""
+def diarize(client: Client, models: Models, job: dict, job_dir: str, wav_file: str, beat: "Heartbeat",
+            window: Optional[tuple[float, float]] = None) -> dict:
+    """The diarize engine: the job's cues and voice samples come from the API next to its audio.
+    window: the clip (media seconds) wav_file has; the cues and the document are in media time"""
     job_id, params = job["id"], job["params"]
     beat.update("downloading", CONVERT_SHARE)
     cues_file = os.path.join(job_dir, "cues.json")
     client.download(client.file_path(job_id, "cues.json"), cues_file)
     with open(cues_file, encoding="utf-8") as f:
         cues = json.load(f)
+    if window:
+        cues = clip.cues_to_clip(cues, *window)
     samples = []
     for sample in params.get("samples", []):
         path = os.path.join(job_dir, sample["file"])
@@ -165,6 +169,8 @@ def diarize(client: Client, models: Models, job: dict, job_dir: str, wav_file: s
         wav_file, cues, samples, lang=params["lang"], speakers=params.get("speakers"),
         on_progress=lambda p: beat.update("diarizing", CONVERT_SHARE + share * p),
         should_cancel=beat.cancelled.is_set)
+    if window:
+        clip.shift_diarize_doc(doc, window[0])
     if params.get("paragraphs"):
         beat.update("paragraphs", CONVERT_SHARE + share)
         add_paragraphs(doc)
@@ -250,18 +256,25 @@ class ServiceUnavailable(Exception):
 
 
 def transcribe_by_service(job: dict, beat: "Heartbeat") -> Optional[dict]:
-    """The transcribe engine with AI_TRNS_STT_URL: the service fetches the media itself"""
+    """The transcribe engine with AI_TRNS_STT_URL: the service fetches the media itself. A clip: the service takes
+    whole media only, so the whole media is transcribed and the clip's cues kept (clip.cut_srt)"""
     from .. import stt_service
     if "url" not in job["source"]:
         raise RuntimeError("the STT service takes media URLs only, not uploaded files")
     try:
-        return stt_service.transcribe(config.STT_URL, job["source"]["url"], job["params"]["lang"],
-                                      config.STT_TIMEOUT_S, beat.update, beat.cancelled.is_set)
+        doc = stt_service.transcribe(config.STT_URL, job["source"]["url"], job["params"]["lang"],
+                                     config.STT_TIMEOUT_S, beat.update, beat.cancelled.is_set)
     except stt_service.Cancelled:
         log.info("job %s cancelled", job["id"])
         return None
     except stt_service.Unavailable as e:
         raise ServiceUnavailable(str(e)) from None
+    part = job["params"].get("clip")
+    if not part:
+        return doc
+    start, end = clip.window(part, doc["duration_s"])
+    return stt_service.document_from_srt(clip.cut_srt(doc["srt"], start, end), doc["duration_s"], doc["language"],
+                                         doc["model"])
 
 
 def can_fall_back(job: dict) -> bool:
@@ -282,16 +295,19 @@ def run_locally(client: Client, models: Models, job: dict, job_dir: str, beat: "
     duration = audio.get_duration(source)
     if duration == 0:
         raise RuntimeError("could not determine audio duration")
+    # a clip: only its part of the audio; the document in media time
+    window = clip.window(params["clip"], duration) if params.get("clip") else None
+    start, end = window or (0.0, duration)
     wav_file = os.path.join(job_dir, "audio.wav")
-    if not audio.convert_to_wav(source, wav_file, duration,
+    if not audio.convert_to_wav(source, wav_file, end - start,
                                 lambda p: beat.update("converting", CONVERT_SHARE * p),
-                                beat.cancelled.is_set):
+                                beat.cancelled.is_set, start=start, length=end - start if window else None):
         log.info("job %s cancelled", job_id)
         return None
     from ..transcriber import Cancelled
     try:
         if params.get("kind") == DIARIZE:
-            doc = diarize(client, models, job, job_dir, wav_file, beat)
+            doc = diarize(client, models, job, job_dir, wav_file, beat, window)
         else:
             beat.update("loading_model", CONVERT_SHARE)
             transcriber = models.get(params["lang"])
@@ -300,6 +316,7 @@ def run_locally(client: Client, models: Models, job: dict, job_dir: str, beat: "
                 wav_file, profile=params.get("profile"), batch_size=config.BATCH_SIZE,
                 on_progress=lambda p: beat.update("transcribing", CONVERT_SHARE + (1 - CONVERT_SHARE) * p),
                 should_cancel=beat.cancelled.is_set)
+            clip.shift_words_doc(doc, start)
     except Cancelled:
         log.info("job %s cancelled", job_id)
         return None

@@ -179,7 +179,7 @@ def test_diarize_finds_the_source_by_uid(client, audio_file, kmedia, tmp_path):
     assert [(s["id"], s["kind"], s["matched_words"], s["used"]) for s in stats["sources"]] == [
         ("SrcDocx1", "source", 28, True), ("LikDocx1", "likutim", 0, False), ("Ins00001", "likutim", 0, False)]
     paragraphs = client.get(f"/jobs/{job_id}/result?format=paragraphs", headers=H).json()
-    assert [p["label"] for p in paragraphs["paragraphs"]] == ["קריין", "רב"]
+    assert [p["label"] for p in paragraphs["paragraphs"]] == ["קריין", "הרב"]
     assert paragraphs["stats"]["sources"] == stats["sources"] and paragraphs["stats"]["reader_turns"] == 1
 
 
@@ -201,7 +201,7 @@ def test_without_a_source_the_job_goes_on(client, audio_file, kmedia):
     assert job["status"] == "done"
     assert job["stats"]["sources"] == [] and job["stats"]["sources_error"] == "kmedia: timed out"
     paragraphs = client.get(f"/jobs/{job['id']}/result?format=paragraphs", headers=H).json()
-    assert [p["label"] for p in paragraphs["paragraphs"]] == ["תלמיד", "רב"]
+    assert [p["label"] for p in paragraphs["paragraphs"]] == ["תלמיד", "הרב"]
     # a job without uid or source: no source stats at all
     r = post(client, audio_file, {})
     assert "sources" not in (finish(client, r.json()["id"], reading_doc())["stats"] or {})

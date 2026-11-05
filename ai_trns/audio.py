@@ -63,10 +63,13 @@ def load_pcm(path: str):
 
 def convert_to_wav(source: str, wav_file: str, duration: float,
                    on_progress: Optional[Callable[[float], None]] = None,
-                   should_cancel: Optional[Callable[[], bool]] = None) -> bool:
-    """16 kHz mono wav. Returns False if cancelled; raises RuntimeError on ffmpeg failure"""
-    cmd = ["ffmpeg", "-nostdin", *_protocols(source), "-i", source,
-           "-map", "0:a:0", "-ac", "1", "-ar", "16000", "-f", "wav", wav_file, "-y", "-loglevel", "info"]
+                   should_cancel: Optional[Callable[[], bool]] = None,
+                   start: float = 0.0, length: Optional[float] = None) -> bool:
+    """16 kHz mono wav; start / length (seconds): only that part of the source (duration: its length, for the
+    progress). Returns False if cancelled; raises RuntimeError on ffmpeg failure"""
+    part = ["-ss", f"{start:.3f}"] if start else []
+    cmd = ["ffmpeg", "-nostdin", *_protocols(source), *part, "-i", source,
+           *(["-t", f"{length:.3f}"] if length else []), "-map", "0:a:0", "-ac", "1", "-ar", "16000", "-f", "wav", wav_file, "-y", "-loglevel", "info"]
     process = subprocess.Popen(cmd, stderr=subprocess.PIPE, universal_newlines=True, errors="replace")
     tail = []
     try:

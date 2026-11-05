@@ -64,7 +64,7 @@ Each job records its `owner` (`user:<sub>` or `key:<name>`). With no issuer and 
 
 | Method | Path | |
 |---|---|---|
-| `POST` | `/jobs` | multipart: `file` **or** `url`, `lang` (`he`, `en`, `ru`, `auto`), `format` (comma-separated `srt`, `txt`, `json`), `profile`, `fix_rtl` → `202` + job |
+| `POST` | `/jobs` | multipart: `file` **or** `url`, `lang` (`he`, `en`, `ru`, `auto`), `format` (comma-separated `srt`, `txt`, `json`), `profile`, `fix_rtl`, `start` / `end` (a clip: seconds, `3m17s` or `03:17`; only it is processed, the result's times stay the media's; also on `/diarize/*`) → `202` + job |
 | `GET` | `/jobs?limit=50` | the caller's jobs, newest first |
 | `GET` | `/jobs/{id}` | `status` (`queued`, `running`, `done`, `error`, `cancelled`), `stage`, `progress` 0..1, `queue_position`, `worker`, `attempts`, `error` |
 | `GET` | `/jobs/{id}/result?format=srt&fix_rtl=` | result; any format, also one not asked for, is rendered from the job's words |

@@ -3,8 +3,8 @@ Speakers and paragraphs of a lesson against its edited transcript (TASK-speakers
 
 The edited transcript (kabbalahmedia .doc -> text, a paragraph per line) marks who speaks by the line:
 "תלמיד:" / "שאלה:" -> תלמיד; "קריין:" -> קריין, and so are the quoted source lines read after it;
-any other line -> רב. Most readings of the source have no "קריין:", so with the lesson's source text the passages
-of "רב" that read it (runs of SOURCE_MIN_WORDS+ words covered by the source's n-grams, gaps of up to SOURCE_GAP words
+any other line -> הרב. Most readings of the source have no "קריין:", so with the lesson's source text the passages
+of "הרב" that read it (runs of SOURCE_MIN_WORDS+ words covered by the source's n-grams, gaps of up to SOURCE_GAP words
 inside) are the reader's too; a shorter quote of the source inside the Rav's words stays his.
 The transcript's words are aligned to the model's (difflib on normalized words); on the aligned words:
   - speakers: the share of words of each human label that got the same label from the model, the confusion,
@@ -27,7 +27,7 @@ from typing import Optional
 from . import build
 from .build import norm
 
-RAV, READER, STUDENT = "רב", "קריין", "תלמיד"
+RAV, READER, STUDENT = "הרב", "קריין", "תלמיד"
 # A passage of the source read aloud: at least this many words (Rav quotes a line of 4-11 words inside his own words;
 # readings run to tens of words), and up to this many words inside it the source doesn't have (spelling, an
 # editor's word, a short remark) -- measured on 35 lessons, TASK-paragraphs.md 2026-11-05

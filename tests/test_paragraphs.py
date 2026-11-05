@@ -49,8 +49,8 @@ def test_paragraphs_split_at_speaker_changes_and_model_starts():
     doc["paragraph_starts"] = [2, 6]
     result = build.paragraphs(doc)
     assert [(p["label"], p["text"], p["start"], p["end"]) for p in result["paragraphs"]] == [
-        ("רב", "שלום חברים.", 0.0, 1.5), ("רב", "היום נלמד.", 2.0, 3.5), ("תלמיד", "שאלה?", 4.0, 4.5),
-        ("רב", "כן.", 5.0, 5.5), ("רב", "עוד משפט.", 6.0, 7.5)]
+        ("הרב", "שלום חברים.", 0.0, 1.5), ("הרב", "היום נלמד.", 2.0, 3.5), ("תלמיד", "שאלה?", 4.0, 4.5),
+        ("הרב", "כן.", 5.0, 5.5), ("הרב", "עוד משפט.", 6.0, 7.5)]
     assert result["stats"] == {"paragraphs": 5, "turns": 3, "model_breaks": 2, "reader_turns": 0,
                                "reading_words": 0}
     assert result["paragraphs"][1]["words"] == [{"word": "היום", "start": 2.0, "end": 2.5},
@@ -199,13 +199,13 @@ def test_evaluate_against_an_edited_transcript():
     words = lambda s, t0: [{"word": w, "start": t0 + i, "end": t0 + i + 0.5} for i, w in enumerate(s.split())]
     result = {"paragraphs": [
         {"label": "תלמיד", "words": words("קוראים בספר. אור גדול. מאיר.", 0)},
-        {"label": "רב", "words": words("שלום חברים. היום נלמד.", 10)},
-        {"label": "רב", "words": words("עוד משפט.", 20)},
+        {"label": "הרב", "words": words("שלום חברים. היום נלמד.", 10)},
+        {"label": "הרב", "words": words("עוד משפט.", 20)},
         {"label": "תלמיד", "words": words("למה?", 30)},
-        {"label": "רב", "words": words("כי כך.", 40)},
+        {"label": "הרב", "words": words("כי כך.", 40)},
     ]}
     r = evaluate.evaluate(text, result)
-    assert r["speakers"]["רב"] == {"words": 8, "right": 1.0}
+    assert r["speakers"]["הרב"] == {"words": 8, "right": 1.0}
     assert r["speakers"]["קריין"] == {"words": 5, "right": 0.0}
     assert r["speakers"]["תלמיד"] == {"words": 1, "right": 1.0}
     assert r["paragraphs_exact"] == {"p": 1.0, "r": 1.0, "f1": 1.0, "tp": 1, "pred": 1, "gold": 1}
@@ -227,19 +227,19 @@ def test_the_unmarked_reading_of_the_source_is_the_readers():
             "מה זה אומר? כמו שכתוב דברי חז\"ל שאמרו שהעולם נברא בשביל התורה, זה העיקר.\n")
     human = evaluate.human_words(text, source)
     labels = [w["label"] for w in human]
-    assert labels[:2] == ["רב", "רב"]                     # the title
+    assert labels[:2] == ["הרב", "הרב"]                     # the title
     assert labels[2:2 + 25] == ["קריין"] * 25             # the reading, the inserted words too
-    assert set(labels[2 + 25:]) == {"רב"}                 # a 7-word quote inside the Rav's words stays his
-    assert [w["label"] for w in evaluate.human_words(text)] == ["רב"] * len(human)
+    assert set(labels[2 + 25:]) == {"הרב"}                 # a 7-word quote inside the Rav's words stays his
+    assert [w["label"] for w in evaluate.human_words(text)] == ["הרב"] * len(human)
     # a passage shorter than min_words is not a reading
     assert evaluate.source_passages(evaluate.human_words(text), source, min_words=26) == []
     # the evaluation scores the reading as the reader's
     words = lambda s, t0: [{"word": w, "start": t0 + i, "end": t0 + i + 0.5} for i, w in enumerate(s.split())]
     result = {"paragraphs": [{"label": "קריין", "words": words(" ".join(reading), 0)},
-                             {"label": "רב", "words": words(text.split("\n")[2], 30)}]}
+                             {"label": "הרב", "words": words(text.split("\n")[2], 30)}]}
     r = evaluate.evaluate(text, result, source=source)
     assert r["speakers"]["קריין"] == {"words": 25, "right": 1.0}
-    assert r["speakers"]["רב"]["right"] == 1.0
+    assert r["speakers"]["הרב"]["right"] == 1.0
 
 
 SOURCE = "ובזה תבין את דברי חז\"ל, שאמרו שהעולם נברא בשביל התורה והישראל."
@@ -249,13 +249,13 @@ READING = [(w, "SPEAKER_02") for w in "שוב ובזה תבין את דברי ח
 def test_a_turn_reading_the_source_is_the_readers():
     doc = doc_of(READING + RAV + [(w, "SPEAKER_02") for w in "ומה זה אומר על הדרך שלנו היום בבקשה".split()])
     result = build.paragraphs(doc, SOURCE)
-    assert [p["label"] for p in result["paragraphs"]] == ["קריין", "רב", "תלמיד"]
+    assert [p["label"] for p in result["paragraphs"]] == ["קריין", "הרב", "תלמיד"]
     assert result["paragraphs"][0]["speaker"] == "Reader" and result["stats"]["reader_turns"] == 1
     # without the source: a student
-    assert [p["label"] for p in build.paragraphs(doc)["paragraphs"]] == ["תלמיד", "רב", "תלמיד"]
+    assert [p["label"] for p in build.paragraphs(doc)["paragraphs"]] == ["תלמיד", "הרב", "תלמיד"]
     # the Rav reading the source stays the Rav
     rav_reads = doc_of([(w, "Rav") for w, _ in READING])
-    assert [p["label"] for p in build.paragraphs(rav_reads, SOURCE)["paragraphs"]] == ["רב"]
+    assert [p["label"] for p in build.paragraphs(rav_reads, SOURCE)["paragraphs"]] == ["הרב"]
 
 
 def test_the_source_of_a_diarize_job_from_txt_or_docx(client, audio_file, tmp_path):
@@ -298,7 +298,7 @@ def test_reading_is_told_apart_from_speaking_whoever_speaks():
     result = build.paragraphs(doc, LONG_SOURCE)
     assert [(p["label"], p["reading"], len(p["words"])) for p in result["paragraphs"]] == [
         ("קריין", False, 5), ("קריין", True, 21), ("קריין", False, 5),  # the reader announces, reads, talks
-        ("רב", False, 4), ("רב", True, 16), ("רב", False, 4)]          # the Rav reads too: still the Rav's
+        ("הרב", False, 4), ("הרב", True, 16), ("הרב", False, 4)]          # the Rav reads too: still the Rav's
     assert result["stats"]["reading_words"] == 37 and result["stats"]["model_breaks"] == 0
     # a quote shorter than READING_MIN_WORDS is speech
     assert not any(build.reading_words(doc_of([(w, "Rav") for w in LONG_SOURCE.split()[:11]])["words"], LONG_SOURCE))
@@ -312,7 +312,7 @@ def test_the_evaluation_scores_reading_apart_from_speakers():
     words = lambda s, t0: [{"word": w, "start": t0 + i, "end": t0 + i + 0.5} for i, w in enumerate(s.split())]
     result = {"paragraphs": [{"label": "תלמיד", "reading": False, "words": words("כתוב", 0)},
                              {"label": "תלמיד", "reading": True, "words": words(LONG_SOURCE, 1)},
-                             {"label": "רב", "reading": False, "words": words("זה העיקר שם.", 40)}]}
+                             {"label": "הרב", "reading": False, "words": words("זה העיקר שם.", 40)}]}
     r = evaluate.evaluate(text, result, source=LONG_SOURCE)
     n = len(LONG_SOURCE.split())
     assert r["speakers"]["תלמיד"] == {"words": n + 1, "right": 1.0}  # a student quoting the source: a student
@@ -327,4 +327,4 @@ def test_the_reader_is_the_voice_that_announces_the_reading():
     asks = [(w, "SPEAKER_04") for w in "ומה זה אומר על הדרך שלנו היום בבקשה".split()]
     doc = doc_of(announce + RAV + more + RAV + relayed + RAV + asks)
     assert [p["label"] for p in build.paragraphs(doc)["paragraphs"]] == [
-        "קריין", "רב", "קריין", "רב", "תלמיד", "רב", "תלמיד"]
+        "קריין", "הרב", "קריין", "הרב", "תלמיד", "הרב", "תלמיד"]

@@ -112,13 +112,13 @@ def test_diarize_job_goes_to_a_diarize_worker(client, audio_file, api_config):
     r = client.put(f"/worker/jobs/{job['id']}/result", headers=W, params={"worker": "w1"}, json=diarize_doc())
     assert r.status_code == 200, r.text
     result = client.get(f"/jobs/{job['id']}/result", headers=H)
-    assert result.text == ("1\n00:00:00,000 --> 00:00:01,000\nרב: שלום עולם\n\n"
+    assert result.text == ("1\n00:00:00,000 --> 00:00:01,000\nהרב: שלום עולם\n\n"
                            "2\n00:00:01,200 --> 00:00:02,000\nתלמיד: טוב\n\n"
                            "3\n00:00:03,000 --> 00:00:04,000\nתלמיד: מה שלומכם\n")
     assert (result.headers["x-diarize-speakers"], result.headers["x-diarize-split-cues"]) == ("2", "1")
     words = client.get(f"/jobs/{job['id']}/result?format=json", headers=H).json()
     srt = client.post("/diarize/words/srt", headers=H, json={**words, "pad": False})
-    assert srt.text == "1\n00:00:00,100 --> 00:00:03,900\nרב: שלום עולם\nתלמיד: טוב מה שלומכם\n"
+    assert srt.text == "1\n00:00:00,100 --> 00:00:03,900\nהרב: שלום עולם\nתלמיד: טוב מה שלומכם\n"
 
 
 def test_diarize_input_errors_and_a_bad_document(client, audio_file):

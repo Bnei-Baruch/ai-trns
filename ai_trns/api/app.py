@@ -22,7 +22,7 @@ from ..subtitles import render
 from . import config, diarize, live, results, review, tadiff
 from .auth import Principal, can_see, principal
 from .jobs import CANCELLED, DONE, ERROR, QUEUED, RUNNING, TRANSCRIBE, JobStore, kind_of
-from .submit import UPLOAD, create_job as submit_job, job_view as view_of
+from .submit import UPLOAD, clip_of, create_job as submit_job, job_view as view_of
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("ai-trns")
@@ -136,9 +136,15 @@ def create_job(
     format: str = Form("srt", description="comma-separated: txt, srt, json (words with timecodes)"),
     profile: Optional[Literal["stable", "fast", "served"]] = Form(None, description="default: the model's own"),
     fix_rtl: bool = Form(False),
+    start: Optional[str] = Form(None, description="a clip of the media: its start (seconds, 3m17s or 03:17)"),
+    end: Optional[str] = Form(None, description="the clip's end; none: to the end of the media"),
 ):
     params = {"lang": lang, "formats": results.parse_formats(format, "transcribe"), "profile": profile,
               "fix_rtl": fix_rtl}
+    part = clip_of(start, end)
+    if part:
+        # only this part of the media is processed; the result's times are the media's
+        params["clip"] = part
     job_id = submit_job(app.state.store, who, params, file, url)
     return job_view(app.state.store.get(job_id))
 

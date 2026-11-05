@@ -4,7 +4,7 @@ from .srt import write_srt
 
 # Display labels in SRT / paragraphs output; the document keeps the raw ids. Three labels, no names of people:
 # the Rav (voice sample "Rav"), the reader of the source ("Reader": voice samples of readers, if any), the rest
-NAMES = {"Rav": "רב", "Reader": "קריין"}
+NAMES = {"Rav": "הרב", "Reader": "קריין"}
 ANONYMOUS = "תלמיד"
 
 # Layout of an SRT rebuilt from words (resegment)

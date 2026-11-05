@@ -134,7 +134,7 @@ def test_worker_diarizes_with_the_job_cues_and_samples(server, worker, audio_fil
             job = wait_status(http, job_id, ("done", "error"))
             assert (job["status"], job["worker"]) == ("done", "diarize-worker"), job
             assert calls == [(2, [("Guest", b"voice")], "he", {"num_speakers": 2})]
-            assert http.get(f"/jobs/{job_id}/result", headers=H).text.startswith("1\n00:00:00,000 --> 00:00:01,000\nרב: ")
+            assert http.get(f"/jobs/{job_id}/result", headers=H).text.startswith("1\n00:00:00,000 --> 00:00:01,000\nהרב: ")
     finally:
         stop.set()
         thread.join(timeout=10)

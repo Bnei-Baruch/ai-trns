@@ -18,7 +18,7 @@ from ..diarize import KIND, labels
 from ..diarize.srt import parse_srt
 from . import config, results
 from .auth import Principal, principal
-from .submit import create_job, job_view
+from .submit import clip_of, create_job, job_view
 
 router = APIRouter(prefix="/diarize", tags=["diarize"])
 log = logging.getLogger("ai-trns")
@@ -65,7 +65,7 @@ def fetch_sources(job_dir: str, uid: str, vocab_text: str):
 
 def _job(request: Request, who: Principal, fmt: str, audio, url, srt, samples, sample_names, lang, speakers,
          paragraphs: bool = False, source: Optional[UploadFile] = None, uid: Optional[str] = None,
-         background: Optional[BackgroundTasks] = None):
+         background: Optional[BackgroundTasks] = None, start: Optional[str] = None, end: Optional[str] = None):
     try:
         cues = parse_srt(srt.file.read().decode("utf-8-sig"))
     except (UnicodeDecodeError, ValueError) as e:
@@ -85,6 +85,9 @@ def _job(request: Request, who: Principal, fmt: str, audio, url, srt, samples, s
     params = {"kind": KIND, "lang": lang, "formats": [fmt], "profile": None, "fix_rtl": False,
               "samples": named, "speakers": {k: v for k, v in speakers.items() if v is not None},
               "paragraphs": paragraphs}
+    part = clip_of(start, end)
+    if part:
+        params["clip"] = part
     inputs = {results.CUES: json.dumps(cues, ensure_ascii=False).encode("utf-8")}
     text = source_text(source)
     if text:
@@ -112,10 +115,11 @@ def diarize_srt(request: Request, who: Principal = Depends(principal),
                 num_speakers: Optional[int] = Form(None, ge=1), min_speakers: Optional[int] = Form(None, ge=1),
                 max_speakers: Optional[int] = Form(None, ge=1), lang: Literal["en", "he", "ru"] = Form("he"),
                 paragraphs: bool = Form(False), source: Optional[UploadFile] = File(None),
-                uid: Optional[str] = Form(None), background: BackgroundTasks = None):
+                uid: Optional[str] = Form(None), start: Optional[str] = Form(None), end: Optional[str] = Form(None),
+                background: BackgroundTasks = None):
     return _job(request, who, "srt", audio, url, srt, samples, sample_names, lang,
                 dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs, source,
-                uid, background)
+                uid, background, start, end)
 
 
 # POST /diarize/words  same fields as /diarize/srt, the same job
@@ -133,6 +137,8 @@ def diarize_srt(request: Request, who: Principal = Depends(principal),
 #   (another part's LIKUTIM) are dropped. No source found / kmedia down: the job goes on without one.
 #   Which sources were used: the job's stats "sources": [{"id", "name", "unit", "kind", "matched_words", "used"}]
 #   (+ "sources_error"), and the same in ?format=paragraphs "stats". An uploaded file: kind "upload".
+#   start / end (optional; seconds, 3m17s or 03:17; no end: to the end): only this clip of the media is diarized;
+#   the SRT's cues (in the media's time) outside it are dropped, the result's times stay the media's.
 @router.post("/words", status_code=202)
 def diarize_words(request: Request, who: Principal = Depends(principal),
                   audio: Optional[UploadFile] = File(None), url: Optional[str] = Form(None), srt: UploadFile = File(...),
@@ -140,10 +146,11 @@ def diarize_words(request: Request, who: Principal = Depends(principal),
                   num_speakers: Optional[int] = Form(None, ge=1), min_speakers: Optional[int] = Form(None, ge=1),
                   max_speakers: Optional[int] = Form(None, ge=1), lang: Literal["en", "he", "ru"] = Form("he"),
                   paragraphs: bool = Form(False), source: Optional[UploadFile] = File(None),
-                  uid: Optional[str] = Form(None), background: BackgroundTasks = None):
+                  uid: Optional[str] = Form(None), start: Optional[str] = Form(None),
+                  end: Optional[str] = Form(None), background: BackgroundTasks = None):
     return _job(request, who, "json", audio, url, srt, samples, sample_names, lang,
                 dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs, source,
-                uid, background)
+                uid, background, start, end)
 
 
 class _Word(BaseModel):

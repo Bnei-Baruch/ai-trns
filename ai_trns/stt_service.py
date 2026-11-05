@@ -49,7 +49,7 @@ def model_name(service_url: str) -> str:
 
 def document_from_srt(srt: str, duration_s: Optional[float], language: str, model: str) -> dict:
     """The service's SRT -> words document (ai_trns.words) carrying that SRT"""
-    cues = [c for c in parse_srt(srt) if c["text"].split()]
+    cues = [c for c in parse_srt(srt) if c["text"].split()] if srt.strip() else []
     duration_s = float(duration_s or (cues[-1]["end"] if cues else 0.0))
     segments, words = [], []
     for c in cues:

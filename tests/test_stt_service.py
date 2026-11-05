@@ -196,6 +196,29 @@ def test_uploads_and_other_languages_run_on_the_local_model(server, service, tmp
     assert used == ["he", "en"]
 
 
+def test_a_clip_by_the_service_keeps_the_clip_cues(service):
+    """The service takes whole media: the worker keeps the cues of the clip, in the media's time"""
+    from ai_trns.diarize.srt import parse_srt
+    from ai_trns.worker import __main__ as w
+    from ai_trns.worker import config
+
+    class Beat:
+        cancelled = threading.Event()
+
+        def update(self, stage, progress):
+            pass
+
+    config_url = config.STT_URL
+    config.STT_URL = service.url
+    try:
+        job = {"id": "j", "params": {"lang": "he", "clip": {"start": 2.0, "end": 4.0}}, "source": {"url": MEDIA}}
+        doc = w.transcribe_by_service(job, Beat())
+    finally:
+        config.STT_URL = config_url
+    assert [(c["start"], c["text"]) for c in parse_srt(doc["srt"])] == [(2.5, 'לחו"ל היום')]
+    assert doc["text"] == 'לחו"ל היום' and doc["words"][0]["start_s"] >= 2.5
+
+
 def test_without_a_local_model_the_service_worker_takes_hebrew_only(tmp_path, monkeypatch):
     from ai_trns.worker import __main__ as w
     from ai_trns.worker import config
@@ -229,7 +252,7 @@ def test_an_unreachable_service_falls_back_to_the_local_model(server, tmp_path, 
     # the job's URL is served from a local file: the fallback reads the media itself
     monkeypatch.setattr(w.audio, "get_duration", lambda source: 4.0)
     monkeypatch.setattr(w.audio, "convert_to_wav",
-                        lambda source, wav, duration, progress, cancel: w.shutil.copy(audio_file, wav) or True)
+                        lambda source, wav, duration, progress, cancel, **kw: w.shutil.copy(audio_file, wav) or True)
     stop = threading.Event()
     thread = threading.Thread(target=w.main, args=(stop,), daemon=True)
     thread.start()

@@ -238,8 +238,8 @@ def test_every_word_kept_in_order():
 
 def test_names_replace_labels():
     words = _seq(["aa"], "Rav") + _seq(["bb"], "SPEAKER_01", start=0.5)
-    cues = build_cues(words, max_chars=40, names={"Rav": "רב"})
-    assert cues[0]["text"] == "רב: aa\nSPEAKER_01: bb"
+    cues = build_cues(words, max_chars=40, names={"Rav": "הרב"})
+    assert cues[0]["text"] == "הרב: aa\nSPEAKER_01: bb"
 
 
 def _c(start, end):
@@ -361,13 +361,13 @@ def test_speaker_cues_keep_single_speaker_cues_and_split_mixed_ones():
     ]
     srt, stats = labels.labeled_srt(cues, doc)
     assert stats == {"speakers": 2, "named": 1, "split_cues": 1}
-    assert [c["text"] for c in parse_srt(srt)] == ["רב: a b\nc", "רב: d e", "תלמיד: f g", ""]
+    assert [c["text"] for c in parse_srt(srt)] == ["הרב: a b\nc", "הרב: d e", "תלמיד: f g", ""]
 
 
 def test_words_srt_labels_and_rejects_no_words():
     words = [{"word": "aa", "start": 0.0, "end": 0.4, "speaker": "Rav"},
              {"word": "bb", "start": 0.5, "end": 0.9, "speaker": "SPEAKER_03"}]
-    assert labels.words_srt(words, pad=False) == "1\n00:00:00,000 --> 00:00:00,900\nרב: aa\nתלמיד: bb\n"
+    assert labels.words_srt(words, pad=False) == "1\n00:00:00,000 --> 00:00:00,900\nהרב: aa\nתלמיד: bb\n"
     with pytest.raises(ValueError):
         labels.words_srt([])
 

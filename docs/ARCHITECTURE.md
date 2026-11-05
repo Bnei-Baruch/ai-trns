@@ -269,7 +269,7 @@ ai-trns/
   `pyannote/speaker-diarization-community-1` принята), `pip install -r requirements-diarize.txt`. Без этого воркер
   берёт только распознавание, задачи diarize ждут в очереди. Модели одна за раз: при смене вида задачи
   предыдущая выгружается.
-- **Абзацы и метки `רב` / `קריין` / `תלמיד`** (`ai_trns/paragraphs`): diarize-задача с `paragraphs=true` после диаризации
+- **Абзацы и метки `הרב` / `קריין` / `תלמיד`** (`ai_trns/paragraphs`): diarize-задача с `paragraphs=true` после диаризации
   отдаёт текст реплик Рава сервису абзацев (`AI_TRNS_PARAGRAPHS_URL`, mdb-lora на `stt`, `ai-trns-paragraphs`) и кладёт в
   документ `paragraph_starts` (индексы слов). `?format=paragraphs` строит API: новый абзац на каждой смене спикера и там, где
   его ставит модель; чтец — голос, объявляющий чтение, иначе по тексту источника (`source=` .txt/.docx). Сервис недоступен —

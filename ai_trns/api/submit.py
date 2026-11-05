@@ -7,7 +7,7 @@ from typing import Optional
 
 from fastapi import HTTPException, UploadFile
 
-from .. import audio
+from .. import audio, clip
 from . import config
 from .auth import Principal
 from .jobs import TRANSCRIBE, JobStore, engine_of
@@ -62,6 +62,15 @@ def create_job(store: JobStore, who: Principal, params: dict, file: Optional[Upl
     store.create(params, source, job_id, owner=who.owner)
     log.info("job %s (%s) created by %s", job_id, params.get("kind", "transcribe"), who.name)
     return job_id
+
+
+def clip_of(start: Optional[str], end: Optional[str]) -> Optional[dict]:
+    """params["clip"] from the client's start / end form fields (seconds, "3m17s" or "03:17"; see ai_trns.clip);
+    None: the whole media"""
+    try:
+        return clip.make(start, end)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
 
 
 def job_view(store: JobStore, job: dict) -> dict:
