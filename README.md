@@ -99,6 +99,9 @@ API (`ai-trns-api.env`):
 | `AI_TRNS_MAX_ATTEMPTS` | `3` | times a job is given to workers before it fails |
 | `AI_TRNS_JOB_TTL_HOURS` | `72` | finished jobs and their files are deleted after this |
 | `AI_TRNS_CORS_ORIGINS` | empty | comma-separated |
+| `AI_TRNS_SOURCES_TIMEOUT` | `15` | seconds per kmedia / CDN request when `/diarize/*` gets a lesson `uid` (`ai_trns.sources`) |
+| `AI_TRNS_SOURCES_CACHE_DIR` | `<jobs dir>/sources-cache` | extracted source texts by CDN file id |
+| `AI_TRNS_SOURCES_CACHE_MB` / `_DAYS` | `50` / `30` | cache limits: total size, days since last use |
 
 Worker (`ai-trns-worker.env`):
 

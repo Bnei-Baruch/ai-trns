@@ -5,7 +5,8 @@ What a job makes of its worker's document, by kind (ai_trns.api.jobs.kind_of). C
     transcribe  transcribe   -                        txt, srt, json
     tadiff      transcribe   text.txt                 diff, txt, srt, json
     docdiff     transcribe   doc.docx                 docx, diff, txt, srt, json
-    diarize     diarize      cues.json, sample<i>.*   srt, json, paragraphs
+    diarize     diarize      cues.json, sample<i>.*,  srt, json, paragraphs
+                             source.txt | sources.json
     live        live         -                        srt, txt, json
 
 json is always the worker's document as is: a words document (ai_trns.words) from the
@@ -46,6 +47,8 @@ STATS = {
 }
 # Inputs a job kind keeps in its dir, next to the uploaded audio
 TEXT, DOC, CUES, SOURCE = "text.txt", "doc.docx", "cues.json", "source.txt"
+# The lesson's sources the server fetched by its uid (ai_trns.sources.fetch), when no source file was given
+SOURCES = "sources.json"
 # docdiff: shortest skipped passage that is highlighted; shorter gaps are mostly ASR noise
 MIN_REMOVED_WORDS = 5
 
@@ -126,6 +129,34 @@ def _diff_stats(diff: dict) -> dict:
     return {**diff["stats"], **{k: len(diff[k]) for k in ("removed", "added", "changed")}}
 
 
+def lesson_source(job_dir: str, params: dict, doc: dict) -> tuple[Optional[str], dict]:
+    """A diarize job's source text and the stats of where it came from: {"sources": [{"id", "name", "unit", "kind",
+    "matched_words", "used"}], "sources_error"?}. An uploaded file is used as is; the texts fetched by uid only
+    those the transcript reads (ai_trns.sources.select). Nothing: (None, {})"""
+    from .. import sources
+    if os.path.exists(os.path.join(job_dir, SOURCE)):
+        text = _read(job_dir, SOURCE)
+        matched = sources.matched_words(text, sources.transcript_keys(doc["words"]))
+        return text, {"sources": [{"name": params.get("source_name") or SOURCE, "kind": "upload",
+                                   "matched_words": matched, "used": True}]}
+    if not params.get("uid"):
+        return None, {}
+    if not os.path.exists(os.path.join(job_dir, SOURCES)):
+        return None, {"sources": [], "sources_error": "not fetched"}
+    try:
+        found = json.loads(_read(job_dir, SOURCES))
+        text, info = sources.select(found.get("files") or [], doc["words"])
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        return None, {"sources": [], "sources_error": f"bad {SOURCES}: {e}"}
+    info += [{**s, "matched_words": None, "used": False} for s in found.get("skipped") or []]
+    stats = {"sources": info}
+    if found.get("error"):
+        stats["sources_error"] = found["error"]
+    elif not info:
+        stats["sources_error"] = "no source found"
+    return text, stats
+
+
 def render(job_dir: str, params: dict, doc: dict, fmt: str,
            fix_rtl: Optional[bool] = None) -> tuple[str | bytes, Optional[dict]]:
     """The worker's document -> one format of the job's kind, and the job's stats if this format
@@ -137,11 +168,13 @@ def render(job_dir: str, params: dict, doc: dict, fmt: str,
     if kind == "diarize":
         labels.check(doc)
         if fmt == "json":
-            return json.dumps(doc, ensure_ascii=False), None
+            return json.dumps(doc, ensure_ascii=False), lesson_source(job_dir, params, doc)[1] or None
         if fmt == "paragraphs":
             from ..paragraphs.build import paragraphs
-            source = _read(job_dir, SOURCE) if os.path.exists(os.path.join(job_dir, SOURCE)) else None
-            return json.dumps(paragraphs(doc, source), ensure_ascii=False), None
+            source, source_stats = lesson_source(job_dir, params, doc)
+            result = paragraphs(doc, source)
+            result["stats"].update(source_stats)
+            return json.dumps(result, ensure_ascii=False), None
         content, stats = labels.labeled_srt(json.loads(_read(job_dir, CUES)), doc)
         stats = {**stats, **{k: doc["stats"][k] for k in ("mixed_cues", "vad_fallback_cues") if k in doc["stats"]}}
         return (fix_rtl_srt(content) if fix_rtl and doc.get("language") == "he" else content), stats

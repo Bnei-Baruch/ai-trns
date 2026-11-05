@@ -4,21 +4,24 @@ Speaker labels for an existing SRT (moved from stt-api /diarize). A job for the 
 from those words here (ai_trns.diarize.labels). Results: GET /jobs/{id}/result.
 """
 import json
+import logging
 import os
 import re
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from .. import sources
 from ..diarize import KIND, labels
 from ..diarize.srt import parse_srt
-from . import results
+from . import config, results
 from .auth import Principal, principal
 from .submit import create_job, job_view
 
 router = APIRouter(prefix="/diarize", tags=["diarize"])
+log = logging.getLogger("ai-trns")
 
 _EXT_RE = re.compile(r"^\.[a-z0-9]{1,5}$")
 
@@ -42,12 +45,34 @@ def source_text(source: Optional[UploadFile]) -> Optional[bytes]:
         raise HTTPException(400, "source must be UTF-8 text or .docx")
 
 
+def fetch_sources(job_dir: str, uid: str, vocab_text: str):
+    """In the background after the job is created: the lesson's sources -> <job dir>/sources.json (results.SOURCES).
+    Fetched here, not by the worker: the source is used where the result is rendered (results.lesson_source),
+    and a failure only leaves the job without a source"""
+    cache = sources.Cache(config.SOURCES_CACHE_DIR or os.path.join(config.JOBS_DIR, "sources-cache"),
+                          config.SOURCES_CACHE_MB, config.SOURCES_CACHE_DAYS)
+    try:
+        found = sources.fetch(uid, cache, vocab_text, timeout=config.SOURCES_TIMEOUT)
+        if not os.path.isdir(job_dir):
+            return
+        path = os.path.join(job_dir, results.SOURCES)
+        with open(path + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(found, f, ensure_ascii=False)
+        os.replace(path + ".tmp", path)
+    except Exception:
+        log.exception("sources %s: not saved", uid)
+
+
 def _job(request: Request, who: Principal, fmt: str, audio, url, srt, samples, sample_names, lang, speakers,
-         paragraphs: bool = False, source: Optional[UploadFile] = None):
+         paragraphs: bool = False, source: Optional[UploadFile] = None, uid: Optional[str] = None,
+         background: Optional[BackgroundTasks] = None):
     try:
         cues = parse_srt(srt.file.read().decode("utf-8-sig"))
     except (UnicodeDecodeError, ValueError) as e:
         raise HTTPException(400, f"Invalid SRT: {e}")
+    uid = (uid or "").strip() or None
+    if uid and not sources.UID_RE.match(uid):
+        raise HTTPException(400, "uid: a kmedia content unit id (8 letters and digits)")
     if sample_names and len(sample_names) != len(samples):
         raise HTTPException(400, "sample_names must match samples one-to-one")
     uploads, named = {}, []
@@ -64,7 +89,13 @@ def _job(request: Request, who: Principal, fmt: str, audio, url, srt, samples, s
     text = source_text(source)
     if text:
         inputs[results.SOURCE] = text
-    return job_view(store, store.get(create_job(store, who, params, audio, url, inputs, uploads)))
+        params["source_name"] = os.path.basename(source.filename or "source")
+    if uid:
+        params["uid"] = uid
+    job_id = create_job(store, who, params, audio, url, inputs, uploads)
+    if uid and not text and background is not None:
+        background.add_task(fetch_sources, store.job_dir(job_id), uid, " ".join(c["text"] for c in cues))
+    return job_view(store, store.get(job_id))
 
 
 # POST /diarize/srt  multipart: audio=<file> or url=<str>, srt=<file>,
@@ -80,9 +111,11 @@ def diarize_srt(request: Request, who: Principal = Depends(principal),
                 samples: list[UploadFile] = File(default=[]), sample_names: list[str] = Form(default=[]),
                 num_speakers: Optional[int] = Form(None, ge=1), min_speakers: Optional[int] = Form(None, ge=1),
                 max_speakers: Optional[int] = Form(None, ge=1), lang: Literal["en", "he", "ru"] = Form("he"),
-                paragraphs: bool = Form(False), source: Optional[UploadFile] = File(None)):
+                paragraphs: bool = Form(False), source: Optional[UploadFile] = File(None),
+                uid: Optional[str] = Form(None), background: BackgroundTasks = None):
     return _job(request, who, "srt", audio, url, srt, samples, sample_names, lang,
-                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs, source)
+                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs, source,
+                uid, background)
 
 
 # POST /diarize/words  same fields as /diarize/srt, the same job
@@ -95,15 +128,22 @@ def diarize_srt(request: Request, who: Principal = Depends(principal),
 #   change, inside the Rav's turns where the model puts one (without paragraphs=true: speaker turns only).
 #   source=<file> (.txt or .docx, optional): the lesson's source text; a turn of someone else that reads it is
 #   labeled קריין (the reader) in ?format=paragraphs.
+#   uid=<kmedia content unit id> (optional; a `source` file wins): the server finds the lesson's sources itself
+#   (its SOURCE units, LIKUTIM -- ai_trns.sources), in the background; the texts the transcript doesn't read
+#   (another part's LIKUTIM) are dropped. No source found / kmedia down: the job goes on without one.
+#   Which sources were used: the job's stats "sources": [{"id", "name", "unit", "kind", "matched_words", "used"}]
+#   (+ "sources_error"), and the same in ?format=paragraphs "stats". An uploaded file: kind "upload".
 @router.post("/words", status_code=202)
 def diarize_words(request: Request, who: Principal = Depends(principal),
                   audio: Optional[UploadFile] = File(None), url: Optional[str] = Form(None), srt: UploadFile = File(...),
                   samples: list[UploadFile] = File(default=[]), sample_names: list[str] = Form(default=[]),
                   num_speakers: Optional[int] = Form(None, ge=1), min_speakers: Optional[int] = Form(None, ge=1),
                   max_speakers: Optional[int] = Form(None, ge=1), lang: Literal["en", "he", "ru"] = Form("he"),
-                  paragraphs: bool = Form(False), source: Optional[UploadFile] = File(None)):
+                  paragraphs: bool = Form(False), source: Optional[UploadFile] = File(None),
+                  uid: Optional[str] = Form(None), background: BackgroundTasks = None):
     return _job(request, who, "json", audio, url, srt, samples, sample_names, lang,
-                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs, source)
+                dict(num_speakers=num_speakers, min_speakers=min_speakers, max_speakers=max_speakers), paragraphs, source,
+                uid, background)
 
 
 class _Word(BaseModel):

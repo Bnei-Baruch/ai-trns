@@ -39,6 +39,13 @@ TRANSCRIBE_UPLOADS = os.environ.get("AI_TRNS_TRANSCRIBE_UPLOADS", "0").lower() i
 MAX_ATTEMPTS = int(os.environ.get("AI_TRNS_MAX_ATTEMPTS", "3"))
 JOB_TTL_HOURS = float(os.environ.get("AI_TRNS_JOB_TTL_HOURS", "72"))
 
+# Lesson sources the server fetches for /diarize/* `uid` (ai_trns.sources): kmedia / CDN timeout per request
+# (seconds), and a cache of the extracted texts by file id (default <jobs dir>/sources-cache), its size and age limits
+SOURCES_TIMEOUT = float(os.environ.get("AI_TRNS_SOURCES_TIMEOUT", "15"))
+SOURCES_CACHE_DIR = os.environ.get("AI_TRNS_SOURCES_CACHE_DIR", "")
+SOURCES_CACHE_MB = float(os.environ.get("AI_TRNS_SOURCES_CACHE_MB", "50"))
+SOURCES_CACHE_DAYS = float(os.environ.get("AI_TRNS_SOURCES_CACHE_DAYS", "30"))
+
 # Live text into a Google Doc the server creates per live job (ai_trns.api.gdoc): the account's JSON
 # (a service account's key or an authorized_user); empty = off. The folder to create docs in (a service
 # account needs one in a shared drive); the role anyone with the link gets ("reader", "commenter",

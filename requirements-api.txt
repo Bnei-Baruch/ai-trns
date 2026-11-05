@@ -5,3 +5,5 @@ python-multipart>=0.0.9
 pyjwt[crypto]>=2.8
 # /docdiff: reading and highlighting .docx
 python-docx>=1.1
+# lesson sources fetched by uid (ai_trns.sources): old TES parts are PDF only
+pypdf>=4.0
