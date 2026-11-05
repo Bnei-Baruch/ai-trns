@@ -79,7 +79,7 @@ jobs:
           busy=$(ssh "$HOST" 'curl -sf localhost:8766/health' | python3 -c '
           import json, sys
           h = json.load(sys.stdin)
-          busy = [f"{w}: {s[\"job\"]}" for w, s in h["workers"].items() if s.get("job")]
+          busy = [w + ": " + s["job"] for w, s in h["workers"].items() if s.get("job")]
           print(", ".join(busy))')
           if [ -n "$busy" ]; then
             echo "::error::jobs are running ($busy); wait, or run again with force"
