@@ -7,9 +7,11 @@ Live transcription (TASK-live-transcription.md): a job of kind "live" for the wo
                                a client joining late first gets the final words so far
     POST /live/{id}/stop       leave; the last listener finishes the job (the worker sends what it has,
                                the job ends done as usual)
-    PUT  /live/{id}/doc        url, title: a listener's page writes the text into this Google Doc of its
-                               user's; the page repeats it every BROWSER_DOC_S while it writes
-    DELETE /live/{id}/doc      url: it stopped
+    PUT  /live/{id}/doc        url, title, page: a listener's page writes the text into this Google Doc of
+                               its user's; the page repeats it every BROWSER_DOC_S while it writes.
+                               One page per doc: 409 while another page writes it (or it is the
+                               server's doc), since each page appends the same text
+    DELETE /live/{id}/doc      url, page: it stopped
     The server's own doc (ai_trns.api.gdoc, if configured) is created with the job. Listeners learn
     about the docs from "docs" events: {"server": {url, title} | {error} | null, "browser": [{url, title, by}]}
 
@@ -62,7 +64,7 @@ class Live:
         # the server's Google Doc of a job, and its writer
         self.server_docs: dict[str, dict] = {}
         self.writers: dict[str, gdoc.Writer] = {}
-        # the docs listeners' pages write: job id -> doc url -> {url, title, by, owner, seen}
+        # the docs listeners' pages write: job id -> doc url -> {url, title, by, owner, page, seen}
         self.browser_docs: dict[str, dict[str, dict]] = {}
 
     def hub(self, job_id: str) -> Hub:
@@ -228,9 +230,10 @@ def stop(job_id: str, request: Request, who: Principal = Depends(principal)):
 
 @router.put("/{job_id}/doc")
 def browser_doc(job_id: str, request: Request, who: Principal = Depends(principal), url: str = Form(...),
-                title: str = Form("")):
+                title: str = Form(""), page: str = Form("")):
     """A listener's page writes the text into this doc of its user's (and says so again every
-    BROWSER_DOC_S); the other listeners see it in the list"""
+    BROWSER_DOC_S); the other listeners see it in the list. page: the writing page's id (a page that
+    sends none is told apart by its user only)"""
     job = _job(request, job_id, who)
     if job["status"] not in (QUEUED, RUNNING):
         raise HTTPException(409, "job is already finished")
@@ -241,15 +244,22 @@ def browser_doc(job_id: str, request: Request, who: Principal = Depends(principa
     live = request.app.state.live
     docs = live.browser_docs.setdefault(job_id, {})
     key = gdoc.doc_url(doc)
-    new = key not in docs or docs[key]["title"] != title[:200]
-    docs[key] = {"url": key, "title": title[:200], "by": who.name, "owner": who.owner, "seen": time.time()}
+    server = live.server_docs.get(job_id) or {}
+    if server.get("url") == key:
+        raise HTTPException(409, "the server already writes this doc")
+    held = docs.get(key)
+    if held and (held["owner"], held["page"]) != (who.owner, page) and time.time() - held["seen"] <= BROWSER_DOC_S:
+        raise HTTPException(409, f"{held['by']} already writes this doc")
+    new = held is None or held["title"] != title[:200]
+    docs[key] = {"url": key, "title": title[:200], "by": who.name, "owner": who.owner, "page": page,
+                 "seen": time.time()}
     if new:
         live.publish_docs(job_id)
     return {"ok": True}
 
 
 @router.delete("/{job_id}/doc")
-def drop_browser_doc(job_id: str, request: Request, url: str, who: Principal = Depends(principal)):
+def drop_browser_doc(job_id: str, request: Request, url: str, page: str = "", who: Principal = Depends(principal)):
     _job(request, job_id, who)
     live = request.app.state.live
     try:
@@ -257,7 +267,7 @@ def drop_browser_doc(job_id: str, request: Request, url: str, who: Principal = D
     except gdoc.DocError as e:
         raise HTTPException(422, str(e))
     entry = live.browser_docs.get(job_id, {}).get(key)
-    if entry and (entry["owner"] == who.owner or who.sees_all):
+    if entry and ((entry["owner"], entry["page"]) == (who.owner, page) or who.sees_all):
         del live.browser_docs[job_id][key]
         live.publish_docs(job_id)
     return {"ok": True}

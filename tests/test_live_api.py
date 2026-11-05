@@ -206,3 +206,36 @@ def test_hub_counts_its_listeners():
     assert hub.listeners == 1 and hub.idle_s() == 0
     stream.close()
     assert hub.listeners == 0
+
+
+DOC = "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit"
+
+
+def test_one_page_writes_a_doc(client, oidc):  # noqa: F811
+    from ai_trns.api import live
+    from tests.test_auth import token
+    u1, u2 = token("u1"), token("u2")
+    job_id = client.post("/live", headers=u1, data={"url": STREAM}).json()["id"]
+    put = lambda who, page: client.put(f"/live/{job_id}/doc", headers=who,  # noqa: E731
+                                       data={"url": DOC + "?tab=t.0", "title": "t", "page": page})
+    assert put(u1, "a").status_code == 200
+    assert put(u1, "a").status_code == 200  # saying so again
+    # another user, or the same one in another tab, would append the same text a second time
+    r = put(u2, "b")
+    assert r.status_code == 409 and "already writes" in r.text
+    assert put(u1, "b").status_code == 409
+    # someone else's stop does not drop it
+    client.delete(f"/live/{job_id}/doc", headers=u2, params={"url": DOC, "page": "b"})
+    assert put(u2, "b").status_code == 409
+    # once the page is gone (stopped, or silent for BROWSER_DOC_S), another may write it
+    client.app.state.live.browser_docs[job_id][DOC]["seen"] -= live.BROWSER_DOC_S + 1
+    assert put(u2, "b").status_code == 200
+    client.delete(f"/live/{job_id}/doc", headers=u2, params={"url": DOC, "page": "b"})
+    assert put(u1, "a").status_code == 200
+
+
+def test_the_servers_doc_is_not_a_listeners(client):
+    job_id = client.post("/live", headers=H, data={"url": STREAM}).json()["id"]
+    client.app.state.live.server_docs[job_id] = {"url": DOC, "title": "t"}
+    r = client.put(f"/live/{job_id}/doc", headers=H, data={"url": DOC, "page": "a"})
+    assert r.status_code == 409 and "server" in r.text
