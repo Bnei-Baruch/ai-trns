@@ -128,3 +128,9 @@
     nginx на `sttapi.kli.one`; без stt-api не работает.
 - [x] Теперь на `stt`: `mdb-lora` (абзацы) и сервис `ai-trns-paragraphs` на :8766 (4,3 ГБ при работе, выгружается в простое).
 - Образцы голоса Рава на `ai-tools`: 2 из stt-api + 1 новый (урок 30.11.24) — см. `TASK-speakers-paragraphs.md`.
+
+## Дочистка (2026-11-04, решение пользователя)
+- Удалено на `stt`: `/home/wav2vec2-asr-pipeline` (12 ГБ; все коммиты есть на GitHub, ветки `main`/`whisper`), `/home/stt-api-client`, `/home/stt-api-client.bak-20261006`, conda env `api`.
+  Бэкап (без `models/`, есть список моделей и `env-api.yml`): `ai-tools:/root/backup-old-20261104/stt-extra/`.
+- Удалён Angie location `/whisper/` (прокси на whisper_trainer только для stt-api). Бэкап: `ngx:/root/ai-tools.conf.bak.20261104121053`; `angie -t` ок, снаружи `/` и `/ai-trns/health` → 200.
+- Оставлено по решению: `stt:/etc/nginx/conf.d/sttapi.conf`, `ai-tools:/home/amnonbb/trns`, `stt:/home/text_audio_align`.
