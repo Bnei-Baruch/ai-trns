@@ -3,29 +3,41 @@ Speakers and paragraphs of a lesson against its edited transcript (TASK-speakers
 
 The edited transcript (kabbalahmedia .doc -> text, a paragraph per line) marks who speaks by the line:
 "תלמיד:" / "שאלה:" -> תלמיד; "קריין:" -> קריין, and so are the quoted source lines read after it;
-any other line -> רב. Its words are aligned to the model's (difflib on normalized words); on the aligned words:
+any other line -> רב. Most readings of the source have no "קריין:", so with the lesson's source text the passages
+of "רב" that read it (runs of SOURCE_MIN_WORDS+ words covered by the source's n-grams, gaps of up to SOURCE_GAP words
+inside) are the reader's too; a shorter quote of the source inside the Rav's words stays his.
+The transcript's words are aligned to the model's (difflib on normalized words); on the aligned words:
   - speakers: the share of words of each human label that got the same label from the model, the confusion,
     speaker changes missed / extra;
   - paragraphs (inside the Rav's speech on both sides, a speaker change not counted): exact P/R/F1 of paragraph
     starts on the same word, tol1 -- within one sentence (as mdb-lora's eval.py).
-Run: python -m ai_trns.paragraphs.evaluate <lesson.doc.txt> <job result ?format=paragraphs> [...pairs]
+Run: python -m ai_trns.paragraphs.evaluate [--sources DIR] <lesson.doc.txt> <job result ?format=paragraphs> [...pairs]
+  (--sources: the source text of a lesson is DIR/<the transcript's file name>, if there)
 """
 import json
+import os
 import re
 import sys
 from collections import Counter
 from difflib import SequenceMatcher
 from typing import Optional
 
+from . import build
 from .build import norm
 
 RAV, READER, STUDENT = "רב", "קריין", "תלמיד"
+# A passage of the source read aloud: at least this many words (Rav quotes a line of 4-11 words inside his own words;
+# readings run to tens of words), and up to this many words inside it the source doesn't have (spelling, an
+# editor's word, a short remark) -- measured on 35 lessons, TASK-paragraphs.md 2026-11-05
+SOURCE_MIN_WORDS = 12
+SOURCE_GAP = 3
 PREFIXES = {"תלמיד": STUDENT, "שאלה": STUDENT, "קריין": READER}
 _PREFIX_RE = re.compile(r"^\s*(" + "|".join(PREFIXES) + r")\s*:\s*")
 
 
-def human_words(text: str) -> list[dict]:
-    """[{"key", "label", "para"}]: the transcript's words with the speaker of their line and the line number"""
+def human_words(text: str, source: Optional[str] = None) -> list[dict]:
+    """[{"key", "label", "para"}]: the transcript's words with the speaker of their line and the line number;
+    with the source text, the passages of the Rav's lines that read it -> the reader's (source_passages)"""
     out, reading, para = [], False, 0
     for line in text.replace("\r\n", "\n").split("\n"):
         if not line.strip():
@@ -43,6 +55,31 @@ def human_words(text: str) -> list[dict]:
         if keys:
             out += [{"key": k, "label": label, "para": para} for k in keys]
             para += 1
+    if source:
+        for passage in source_passages(out, source):
+            for i in passage:
+                out[i]["label"] = READER
+    return out
+
+
+def source_passages(words: list[dict], source: str, min_words: int = SOURCE_MIN_WORDS,
+                    gap: int = SOURCE_GAP) -> list[range]:
+    """Runs of the Rav's words (human_words) that read the source: words in an n-gram the source has too
+    (build.source_covered), at most `gap` other words between two of them, the run at least `min_words` long"""
+    covered = build.source_covered([w["key"] for w in words], build.source_grams(source))
+    out, i, n = [], 0, len(words)
+    while i < n:
+        if not (covered[i] and words[i]["label"] == RAV):
+            i += 1
+            continue
+        last, j = i, i + 1
+        while j < n and words[j]["label"] == RAV and j - last <= gap + 1:
+            if covered[j]:
+                last = j
+            j += 1
+        if last + 1 - i >= min_words:
+            out.append(range(i, last + 1))
+        i = last + 1
     return out
 
 
@@ -71,9 +108,11 @@ def _prf(tp: int, pred: int, gold: int) -> dict:
             "tp": tp, "pred": pred, "gold": gold}
 
 
-def evaluate(text: str, result: dict, pairs: Optional[list[tuple[int, int]]] = None) -> dict:
-    """pairs: align(human_words(text), model_words(result)) if known (it depends on the words only)"""
-    human, model = human_words(text), model_words(result)
+def evaluate(text: str, result: dict, pairs: Optional[list[tuple[int, int]]] = None,
+             source: Optional[str] = None) -> dict:
+    """pairs: align(human_words(text), model_words(result)) if known (it depends on the words only);
+    source: the lesson's source text (human_words)"""
+    human, model = human_words(text, source), model_words(result)
     pairs = align(human, model) if pairs is None else pairs
     confusion = Counter((human[a]["label"], model[b]["label"]) for a, b in pairs)
     per_label = {}
@@ -121,6 +160,9 @@ def evaluate(text: str, result: dict, pairs: Optional[list[tuple[int, int]]] = N
 
 
 def main(argv: list[str]) -> None:
+    sources = None
+    if argv[:1] == ["--sources"] and len(argv) > 1:
+        sources, argv = argv[1], argv[2:]
     if len(argv) < 2 or len(argv) % 2:
         raise SystemExit(__doc__)
     for doc_path, result_path in zip(argv[::2], argv[1::2]):
@@ -128,7 +170,11 @@ def main(argv: list[str]) -> None:
             text = f.read()
         with open(result_path, encoding="utf-8") as f:
             result = json.load(f)
-        print(doc_path, json.dumps(evaluate(text, result), ensure_ascii=False))
+        source = None
+        if sources and os.path.exists(os.path.join(sources, os.path.basename(doc_path))):
+            with open(os.path.join(sources, os.path.basename(doc_path)), encoding="utf-8") as f:
+                source = f.read()
+        print(doc_path, json.dumps(evaluate(text, result, source=source), ensure_ascii=False))
 
 
 if __name__ == "__main__":

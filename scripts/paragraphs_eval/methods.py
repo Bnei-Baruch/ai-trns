@@ -6,12 +6,19 @@ Per lesson <id> (test.txt / tune.txt), in --dir:
   docs/<id>.txt   the edited transcript (the reference: paragraphs and who speaks)
   preds/<adapter>.m<merge>.jsonl   adapter answers for the Rav text: {"id", "sentences", "breaks"} (predict_set.py)
   emb/<id>.m<merge>.json          bge-m3 embeddings of the Rav text's sentences (embed_set.py)
+  sources/<id>.txt  (--sources) the lesson's source text (fetch_sources.py): the editor's "Rav" passages that read
+                  it are the reader's (evaluate.source_passages) -- the reference no longer counts the reading as Rav
+  exclude.json    (--exclude) {"<id>": "all" | [[start_s, end_s], ...]}: lessons / spans left out of every score
+                  (the Hebrew track is a simultaneous translation there: TASK-speakers-paragraphs.md)
+Merge (--merges): N -- diarize speakers, others' turns of <= N words between two Rav turns -> Rav; "o" -- the editor's
+speakers (diagnosis); "s" -- the editor's speakers with the source reading as the reader's (needs --sources).
 Every method gives paragraph starts (word indices) inside the Rav's turns; the score is
 ai_trns.paragraphs.evaluate (exact: the same word as the editor's paragraph start, tol1: within one sentence;
 only where both the editor and the model have the Rav, speaker changes not counted), summed over lessons.
 
   python3 scripts/paragraphs_eval/methods.py --dir D --set tune grid      # tune thresholds (tune set only)
   python3 scripts/paragraphs_eval/methods.py --dir D --set test table --params best.json
+  python3 scripts/paragraphs_eval/methods.py --dir D --set test --sources --exclude D/exclude.json speakers
 """
 import argparse
 import bisect
@@ -55,12 +62,12 @@ def merge_short(doc, max_words):
     return doc
 
 
-def oracle_speakers(doc, text):
+def oracle_speakers(doc, text, source=None):
     """Diagnosis only: every word gets the editor's speaker (aligned words; the others -- the one before them),
-    so the paragraphs are measured without diarize errors"""
+    so the paragraphs are measured without diarize errors; with the source, its reading is the reader's"""
     doc = copy.deepcopy(doc)
     words = doc["words"]
-    human = evaluate.human_words(text)
+    human = evaluate.human_words(text, source)
     keyed = [i for i, w in enumerate(words) if build.norm(w["word"])]
     names = {evaluate.RAV: RAV, evaluate.READER: build.READER, evaluate.STUDENT: "SPEAKER_99"}
     label = {}
@@ -73,12 +80,21 @@ def oracle_speakers(doc, text):
     return doc
 
 
+def read_source(d, lid):
+    path = os.path.join(d, "sources", lid + ".txt")
+    return open(path, encoding="utf-8").read() if os.path.exists(path) else None
+
+
 class Lesson:
-    def __init__(self, d, lid, merge):
+    def __init__(self, d, lid, merge, sources=False, exclude=()):
         self.id, self.merge = lid, merge
         self.text = open(os.path.join(d, "docs", lid + ".txt"), encoding="utf-8").read()
+        self.source = read_source(d, lid) if sources else None
         doc = json.load(open(os.path.join(d, "out", lid + ".json"), encoding="utf-8"))
-        self.doc = oracle_speakers(doc, self.text) if merge == "o" else merge_short(doc, int(merge))
+        if merge in ("o", "s"):
+            self.doc = oracle_speakers(doc, self.text, read_source(d, lid) if merge == "s" else None)
+        else:
+            self.doc = merge_short(doc, int(merge))
         self.words = self.doc["words"]
         self.turns = build.speaker_turns(self.words)
         self.rav_turns = [t for t in self.turns if build.turn_speaker(self.words, t) == RAV]
@@ -99,12 +115,15 @@ class Lesson:
             for i in t:
                 self.turn_of[i] = n
         base = build.paragraphs(self.doc)
-        self.human = evaluate.human_words(self.text)
+        self.human = evaluate.human_words(self.text, self.source)
         self.pairs = evaluate.align(self.human, evaluate.model_words(base))
+        if exclude:  # the words heard inside an excluded span are left out of every score
+            times = [w["start"] for p in base["paragraphs"] for w in p["words"] if build.norm(w["word"])]
+            self.pairs = [(a, b) for a, b in self.pairs if not any(s <= times[b] < e for s, e in exclude)]
 
     def score(self, starts):
         doc = dict(self.doc, paragraph_starts=sorted(starts))
-        return evaluate.evaluate(self.text, build.paragraphs(doc), self.pairs)
+        return evaluate.evaluate(self.text, build.paragraphs(doc), self.pairs, self.source)
 
 
 # ---- methods: each returns a set of word indices -------------------------------------------------------------
@@ -290,19 +309,27 @@ def main():
     ap.add_argument("--set", required=True, help="tune / test: <this dir>/<set>.txt")
     ap.add_argument("--merges", default="0,3,6")
     ap.add_argument("--adapters", default="paragraphing,paragraphing_asr")
-    ap.add_argument("cmd", choices=["grid", "table", "texts"], help="texts: write <dir>/texts.<set>.m<merge>.jsonl "
-                    "(the Rav text of each lesson: input of predict_set.py / embed_set.py)")
+    ap.add_argument("--sources", action="store_true", help="the reference: the reading of <dir>/sources/<id>.txt is the reader's")
+    ap.add_argument("--exclude", help="exclude.json: lessons / time spans left out")
+    ap.add_argument("cmd", choices=["grid", "table", "texts", "speakers"], help="texts: write <dir>/texts.<set>.m<merge>.jsonl "
+                    "(the Rav text of each lesson: input of predict_set.py / embed_set.py); speakers: the share of the "
+                    "editor's Rav words the diarize document has as Rav and of the students' it doesn't, without and "
+                    "with the source reading (and the exclusions)")
     ap.add_argument("--params", help="table: JSON list of [label, merge, method, params]")
     ap.add_argument("--out", help="write the results (JSON)")
     args = ap.parse_args()
     ids = read_set(os.path.join(os.path.dirname(os.path.abspath(__file__)), args.set + ".txt"))
     ids = [i for i in ids if os.path.exists(os.path.join(args.dir, "out", i + ".json"))]
-    merges = args.merges.split(",")  # "o": the editor's speakers (diagnosis)
+    merges = args.merges.split(",")  # "o", "s": the editor's speakers (diagnosis)
+    exclude = json.load(open(args.exclude)) if args.exclude else {}
+    if args.cmd == "speakers":
+        return speakers_table(args.dir, ids, exclude, args.out)
+    ids = [i for i in ids if exclude.get(i) != "all"]
     cache = {}
 
     def lessons(merge):
         if merge not in cache:
-            cache[merge] = [Lesson(args.dir, i, merge) for i in ids]
+            cache[merge] = [Lesson(args.dir, i, merge, args.sources, exclude.get(i) or ()) for i in ids]
         return cache[merge]
 
     if args.cmd == "texts":
@@ -333,6 +360,43 @@ def main():
     print(f"{len(ids)} lessons: {' '.join(ids)}")
     if args.out:
         json.dump(results, open(args.out, "w"), ensure_ascii=False, indent=1)
+
+
+def speakers_table(d, ids, exclude, out=None):
+    """Per lesson: Rav = editor's Rav words named Rav by diarize, students = editor's student words not named Rav;
+    before (the transcript as is) and after (the source reading -> reader, exclusions left out); reading = the
+    share of the source passages diarize gave to someone else (the reader, if he read them)"""
+    rows = []
+    for lid in ids:
+        row = {"id": lid, "source": read_source(d, lid) is not None, "excluded": exclude.get(lid)}
+        for key, kw in (("old", {}), ("new", {"sources": True, "exclude": exclude.get(lid) or ()})):
+            if key == "new" and exclude.get(lid) == "all":
+                continue
+            les = Lesson(d, lid, "0", **kw)
+            ev = les.score(set())
+            conf = {tuple(k.split("->")): v for k, v in ev["confusion"].items()}
+            tot = lambda h: sum(v for (a, _), v in conf.items() if a == h)
+            rav = lambda h: conf.get((h, evaluate.RAV), 0)
+            row[key] = {"rav": rav(evaluate.RAV) / tot(evaluate.RAV) if tot(evaluate.RAV) else None,
+                        "rav_words": tot(evaluate.RAV),
+                        "students": 1 - rav(evaluate.STUDENT) / tot(evaluate.STUDENT) if tot(evaluate.STUDENT) else None,
+                        "student_words": tot(evaluate.STUDENT)}
+            if key == "new" and les.source:
+                old = evaluate.human_words(les.text)
+                marked = {a for a, w in enumerate(les.human) if w["label"] != old[a]["label"]}
+                pairs = [(a, b) for a, b in les.pairs if a in marked]
+                model = evaluate.model_words(build.paragraphs(les.doc))
+                row[key]["reading_words"] = len(marked)
+                row[key]["reading_not_rav"] = (sum(model[b]["label"] != evaluate.RAV for _, b in pairs) / len(pairs)
+                                               if pairs else None)
+        rows.append(row)
+        f = lambda x: "  -  " if x is None else f"{x:.3f}"
+        o, n = row["old"], row.get("new") or {}
+        print(f"{lid} src={'y' if row['source'] else 'n'} Rav {f(o['rav'])} -> {f(n.get('rav'))} ({o['rav_words']} -> "
+              f"{n.get('rav_words', '-')} w) | students {f(o['students'])} -> {f(n.get('students'))} | reading "
+              f"{n.get('reading_words', 0)} w, not Rav {f(n.get('reading_not_rav'))}", flush=True)
+    if out:
+        json.dump(rows, open(out, "w"), ensure_ascii=False, indent=1)
 
 
 if __name__ == "__main__":

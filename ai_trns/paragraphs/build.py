@@ -47,10 +47,23 @@ def reader_turns(words: list[dict], turns: list[range], source: Optional[str]) -
     return by_voice or (_source_turns(words, turns, source) if source else set())
 
 
-def _source_turns(words: list[dict], turns: list[range], source: str) -> set[int]:
+def source_grams(source: str, n: int = READER_NGRAM) -> set[tuple]:
+    """The word n-grams of a source text (normalized words)"""
     keys = _keys(source)
-    n = READER_NGRAM
-    grams = {tuple(keys[i:i + n]) for i in range(len(keys) - n + 1)}
+    return {tuple(keys[i:i + n]) for i in range(len(keys) - n + 1)}
+
+
+def source_covered(keys: list[str], grams: set[tuple], n: int = READER_NGRAM) -> list[bool]:
+    """Per normalized word: is it inside a run of n words that the source has too"""
+    covered = [False] * len(keys)
+    for i in range(len(keys) - n + 1):
+        if tuple(keys[i:i + n]) in grams:
+            covered[i:i + n] = [True] * n
+    return covered
+
+
+def _source_turns(words: list[dict], turns: list[range], source: str) -> set[int]:
+    grams = source_grams(source)
     out = set()
     for t, turn in enumerate(turns):
         if turn_speaker(words, turn) in (MODEL_SPEAKER, None):
@@ -58,11 +71,7 @@ def _source_turns(words: list[dict], turns: list[range], source: str) -> set[int
         tk = [k for k in (norm(words[i]["word"]) for i in turn) if k]
         if len(tk) < READER_MIN_WORDS:
             continue
-        covered = [False] * len(tk)
-        for i in range(len(tk) - n + 1):
-            if tuple(tk[i:i + n]) in grams:
-                covered[i:i + n] = [True] * n
-        if sum(covered) / len(tk) >= READER_SHARE:
+        if sum(source_covered(tk, grams)) / len(tk) >= READER_SHARE:
             out.add(t)
     return out
 

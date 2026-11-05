@@ -214,6 +214,33 @@ def test_evaluate_against_an_edited_transcript():
     assert evaluate.evaluate(text, result, pairs) == r
 
 
+def test_the_unmarked_reading_of_the_source_is_the_readers():
+    from ai_trns.paragraphs import evaluate
+    source = ("ובזה תבין את דברי חז\"ל שאמרו שהעולם נברא בשביל התורה והישראל ולכן צריכים להבין את המטרה הזו "
+              "ושכל הבריאה כולה אינה אלא כדי להביא את האדם לדבקות בבורא")
+    reading = source.split()[:24]
+    reading[11] = "ולכן,"           # punctuation is not a difference
+    reading[16:17] = ["אה", "כן"]  # two words the source doesn't have, inside the passage
+    text = ("כותרת השיעור\n"
+            + " ".join(reading) + "\n"
+            "מה זה אומר? כמו שכתוב דברי חז\"ל שאמרו שהעולם נברא בשביל התורה, זה העיקר.\n")
+    human = evaluate.human_words(text, source)
+    labels = [w["label"] for w in human]
+    assert labels[:2] == ["רב", "רב"]                     # the title
+    assert labels[2:2 + 25] == ["קריין"] * 25             # the reading, the inserted words too
+    assert set(labels[2 + 25:]) == {"רב"}                 # a 7-word quote inside the Rav's words stays his
+    assert [w["label"] for w in evaluate.human_words(text)] == ["רב"] * len(human)
+    # a passage shorter than min_words is not a reading
+    assert evaluate.source_passages(evaluate.human_words(text), source, min_words=26) == []
+    # the evaluation scores the reading as the reader's
+    words = lambda s, t0: [{"word": w, "start": t0 + i, "end": t0 + i + 0.5} for i, w in enumerate(s.split())]
+    result = {"paragraphs": [{"label": "קריין", "words": words(" ".join(reading), 0)},
+                             {"label": "רב", "words": words(text.split("\n")[2], 30)}]}
+    r = evaluate.evaluate(text, result, source=source)
+    assert r["speakers"]["קריין"] == {"words": 25, "right": 1.0}
+    assert r["speakers"]["רב"]["right"] == 1.0
+
+
 SOURCE = "ובזה תבין את דברי חז\"ל, שאמרו שהעולם נברא בשביל התורה והישראל."
 READING = [(w, "SPEAKER_02") for w in "שוב ובזה תבין את דברי חז\"ל, שאמרו שהעולם נברא בשביל התורה".split()]
 
