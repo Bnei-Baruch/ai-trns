@@ -1,0 +1,102 @@
+name: CI/CD
+
+# CI: every push and pull request runs the tests (pytest, with ffmpeg; no GPU: fake models).
+# CD: only a manual run (Actions -> CI/CD -> Run workflow, any branch) deploys that commit to the ai-tools host
+# (10.66.24.55, /home/ai-trns/app) and restarts the API and the workers -- docs/ARCHITECTURE.md, "Деплой".
+# The host is on the internal network: SSH goes through ngx.kab.info (a jump-only key there).
+# Python packages are not installed by the deploy: a change of requirements*.txt is installed by hand.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Deploy even while a job is running (a live broadcast is cut, other jobs are retried)"
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+
+      # the API's packages + what the tests import of the worker's (faster-whisper on CPU, numpy, scipy);
+      # torch / pyannote (requirements-diarize.txt) are not needed: the diarize tests use fakes
+      - run: pip install -r requirements-api.txt faster-whisper numpy scipy pytest httpx
+
+      - run: python -m pytest -q tests
+
+  deploy:
+    needs: test
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    env:
+      HOST: root@10.66.24.55
+      APP: /home/ai-trns/app
+      SERVICES: ai-trns-api ai-trns-worker ai-trns-diarize-worker ai-trns-live-worker
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # ssh-keyscan ngx.kab.info; ssh-keyscan 10.66.24.55 (from ngx)
+          cat >> ~/.ssh/known_hosts <<'EOF'
+          ngx.kab.info ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDWoETL4o1h0Jfy8Iotq0FMHCEeOICgr4IHAFbACQSro
+          ngx.kab.info ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMF7krGEChzELXEpRLepaIsMEPftKWFx9JtuwPwiVnu5SqSX1Ra9kdDmxx3V74fJj6wgdJGJV8jYcxN1MDYb+ss=
+          10.66.24.55 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBcAKlu0NldMvRsw8ORQosGOgYqplrdbdkCMJ1EDtB/j
+          10.66.24.55 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAA5QEmxjuUo2HFiCuWMQvu7fX3mvuzeQ98GhXXy3iqVFVjK5PRFrD64reVLEBa5Z4MvCXkWquizTGfbxJlN/3E=
+          EOF
+          cat > ~/.ssh/config <<'EOF'
+          Host ngx.kab.info
+            User root
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+          Host 10.66.24.55
+            User root
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            ProxyJump ngx.kab.info
+          EOF
+
+      - name: No job running
+        if: ${{ !inputs.force }}
+        run: |
+          busy=$(ssh "$HOST" 'curl -sf localhost:8766/health' | python3 -c '
+          import json, sys
+          h = json.load(sys.stdin)
+          busy = [f"{w}: {s[\"job\"]}" for w, s in h["workers"].items() if s.get("job")]
+          print(", ".join(busy))')
+          if [ -n "$busy" ]; then
+            echo "::error::jobs are running ($busy); wait, or run again with force"
+            exit 1
+          fi
+
+      - name: Deploy
+        run: |
+          mkdir -p out
+          git archive HEAD | tar -x -C out
+          ts=$(date +%Y%m%d%H%M%S)
+          # a backup of the running code; the last 5 of the deploy's own are kept
+          ssh "$HOST" "cp -a $APP $APP.bak.ci.$ts && ls -d $APP.bak.ci.* | sort | head -n -5 | xargs -r rm -rf"
+          rsync -a --delete --exclude __pycache__ out/ "$HOST:$APP/"
+          ssh "$HOST" "echo '${{ github.sha }} ${{ github.ref_name }}' > $APP/DEPLOYED && chown -R ai-trns: $APP && systemctl restart $SERVICES"
+
+      - name: Check
+        run: |
+          sleep 10
+          ssh "$HOST" "systemctl is-active $SERVICES && curl -sf localhost:8766/health"

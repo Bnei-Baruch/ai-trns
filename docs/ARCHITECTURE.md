@@ -311,7 +311,12 @@ Ubuntu 24.04, 12 ядер, 15 ГБ RAM, RTX 2080 8 ГБ (Turing), драйвер
 Там же работает `ollama` (`bge-m3`) — тоже использует GPU, по запросу. exec-api (порт 8081, `/home/amnonbb/trns`)
 удалён 2026-11-04: страница Transcription в ai-tools ходит в `/jobs`; бэкап — `TASK-cleanup-old.md`.
 
-Деплой:
+Деплой: GitHub Actions → CI/CD → Run workflow (ветка на выбор; `.github/workflows/ci-cd.yml`): тесты, копия кода
+(`git archive`) в `/home/ai-trns/app`, рестарт API и воркеров, проверка `/health`. Пока идёт задача (трансляция тоже) —
+отказ, если не отмечено `force`. Бэкап — `app.bak.ci.<время>`, хранятся 5 последних; коммит — в `app/DEPLOYED`.
+Пакеты Python (requirements*.txt) деплой не ставит. SSH через `ngx.kab.info`: ключ `DEPLOY_SSH_KEY` (секрет репо) на ngx
+только для прохода к `10.66.24.55:22` (`command=nologin`, `permitopen`), на ai-tools — root с `from="10.77.1.211"`.
+Вручную, как раньше:
 ```bash
 rsync -a --delete --exclude .git --exclude __pycache__ ./ root@10.66.24.55:/home/ai-trns/app/
 ssh root@10.66.24.55 'chown -R ai-trns: /home/ai-trns/app && systemctl restart ai-trns-api ai-trns-worker'
