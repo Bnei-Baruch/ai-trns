@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import jwt
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Request
 
 from . import config
 
@@ -71,8 +71,15 @@ def _service(key: str) -> Optional[Principal]:
     return None
 
 
-def principal(x_api_key: Optional[str] = Header(None), authorization: Optional[str] = Header(None)) -> Principal:
-    """FastAPI dependency: who is calling"""
+def principal(request: Request, x_api_key: Optional[str] = Header(None),
+              authorization: Optional[str] = Header(None)) -> Principal:
+    """FastAPI dependency: who is calling; also noted on the request for the request log (requestlog)"""
+    who = _principal(x_api_key, authorization)
+    request.state.who = who.name
+    return who
+
+
+def _principal(x_api_key: Optional[str], authorization: Optional[str]) -> Principal:
     if not config.OIDC_ISSUER and not config.API_KEYS:
         return OPEN
     bearer = authorization[7:].strip() if authorization and authorization.lower().startswith("bearer ") else None

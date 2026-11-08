@@ -307,6 +307,7 @@ Ubuntu 24.04, 12 ядер, 15 ГБ RAM, RTX 2080 8 ГБ (Turing), драйвер
 | Воркеры | systemd `ai-trns-worker` (`ai-tools-gpu0`, transcribe), `ai-trns-live-worker` (`ai-tools-live0`, live), `ai-trns-diarize-worker` (`ai-tools-diarize0`, diarize); env-файлы рядом, API по `http://127.0.0.1:8766` |
 | Память GPU (8 ГБ) | live 1,8 ГБ, transcribe 2,1 ГБ, diarize 4,1 ГБ. `AI_TRNS_MIN_FREE_GPU_MB`: transcribe 4000, diarize 6200 — live всегда помещается, diarize во время трансляции ждёт |
 | Логи | `journalctl -u ai-trns-api -u ai-trns-worker -u ai-trns-live-worker -u ai-trns-diarize-worker` |
+| Журнал запросов | `/home/ai-trns/logs/requests.log` (`AI_TRNS_LOG_DIR`): каждый запрос к API строкой JSON, новый файл в полночь, 7 дней (`AI_TRNS_LOG_DAYS`) |
 
 Там же работает `ollama` (`bge-m3`) — тоже использует GPU, по запросу. exec-api (порт 8081, `/home/amnonbb/trns`)
 удалён 2026-11-04: страница Transcription в ai-tools ходит в `/jobs`; бэкап — `TASK-cleanup-old.md`.

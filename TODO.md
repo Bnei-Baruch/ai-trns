@@ -53,6 +53,16 @@
       перезаписи: `main/KB74kOBz` оставлен новый, от whisper_trainer; бэкап `review.bak.*`).
 - [ ] Проверить настоящий токен Keycloak пользователя (тестами покрыто, вживую не проверено).
 - [ ] Решить, нужна ли роль администратора (`AI_TRNS_ADMIN_ROLE`).
+- [ ] Проверка роли `AI_TRNS_OIDC_ROLE` (`bb_user`) выключена для всех эндпоинтов (`ai_trns/api/auth.py`, TODO в `_user`):
+      пускает любой токен realm. Вернуть, когда роли раздадут.
+- [ ] `POST /markup` временно без авторизации (2026-11-08): запускать может кто угодно, задачи — на владельца
+      `anon:markup`. Вернуть `Depends(principal)` в `start_markup` (`ai_trns/api/markup.py`) и тест на 401;
+      решить, нужна ли отдельная роль на markup.
+- [x] Журнал запросов (2026-11-08, `ai_trns/api/requestlog.py`): каждый запрос к API — строка JSON в
+      `AI_TRNS_LOG_DIR/requests.log` (IP, метод, путь, статус, время, кто, User-Agent, Origin; у `POST /markup` — uid и
+      задача). Новый файл в полночь, хранится `AI_TRNS_LOG_DAYS=7` дней.
+- [ ] При деплое: `AI_TRNS_LOG_DIR=/home/ai-trns/logs` в `ai-trns-api.env`; проверить, что Angie на `ngx` передаёт
+      `X-Forwarded-For` / `X-Real-IP`, иначе в `ip` будет адрес `ngx`.
 - [x] Клиент ai-tools: страница Transcription через API (`POST /jobs` с токеном Keycloak, опрос, скачивание)
       вместо exec-api + MQTT (2026-11-04, ai-tools PR #4 → master, задеплоено). exec-api удалён — `TASK-cleanup-old.md`.
 - [ ] URL-задачи с `cdn.kabbalahmedia.info`: прогнать настоящую ссылку.
@@ -73,22 +83,6 @@
 ### Воркер на `stt`
 - [ ] Связь `stt → API`: открыть порт `stt → ai-tools`, или через Angie, или push от API.
 - [x] Старый тестовый `ai-trns` и stt-api на `stt` удалены (2026-11-04): GPU `stt` свободна (mdb-lora — абзацы).
-
-### Из stt-api
-- [x] `/review/*` перенесён (`ai_trns/api/review.py`, ветка `review`): урок = задача ai-trns, рецензент из токена.
-      ai-tools (ветка `ai-trns-rest`): Review и תמלול ходят в ai-trns с токеном Keycloak, транскрипции в браузере нет.
-- [x] `/stt/*`-прокси не нужен: תמלול вызывает `/jobs` напрямую.
-- [ ] Перенос данных: `stt:/home/stt-api/data/review` → `ai-tools:/home/ai-trns/review` (права `ai-trns`),
-      задать `AI_TRNS_REVIEW_DIR` в `ai-trns-api.env`. Уроки `pending` без задачи станут `failed` — добавить заново.
-- [x] ai-tools: `REACT_APP_AI_TRNS_API` в `.env` и в Actions variables; `REACT_APP_STT_URL`, `REACT_APP_STT_API` убраны (2026-11-04).
-- [ ] Проверить вживую: добавить урок в Review, дождаться `ready`, сохранить результат, открыть отчёт.
-- [x] diarize / tadiff / docdiff перенесены (ветка `review`): запрос создаёт задачу, результат — `/jobs/{id}/result`.
-      tadiff/docdiff — обычное распознавание + сравнение на API; diarize — движок воркера `diarize`.
-      Движок проверен на `stt` против stt-api: урок 1:45 ч, вывод совпал слово в слово, 159 с на RTX 3070.
-- [x] Diarize развёрнут на `ai-tools` (2026-11-04): `ai-trns-diarize-worker`, venv `env-diarize` (torch cu126), совпал со
-      stt-api слово в слово на уроке 78 мин; порог памяти GPU `AI_TRNS_MIN_FREE_GPU_MB` — подробности в `TASK-cleanup-old.md`.
-- [x] ai-tools: Speakers / Doc diff / Text diff — на задачах ai-trns (202 + опрос), страницы пока выключены в меню.
-- [x] stt-api и старый тестовый ai-trns на `stt` удалены (2026-11-04), бэкап — `TASK-cleanup-old.md`.
 
 ### Live: потоковая транскрипция
 - [ ] Потоковая транскрипция трансляций (текст с задержкой в секунды). План, вопросы и шаги —

@@ -2,7 +2,7 @@
 Lesson markup by a kmedia lesson uid (ai_trns.markup): chapters and the transcript's paragraphs on the lesson's
 time line, read by the kmedia lesson page.
 
-    POST /markup              uid=<kmedia unit>, language=he, force=false   (login: it queues GPU jobs) -> 202 state
+    POST /markup              uid=<kmedia unit>, language=he, force=false   (no login for now, see TODO.md) -> 202 state
     GET  /markup/{uid}        the markup document, no login (lessons are public); 404 until there is one
     GET  /markup/{uid}/status the state of its run, no login
 
@@ -55,6 +55,9 @@ TRANSCRIPT_TYPES = ("tamlil", "", None)
 PUBLIC = {"Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=300"}
 
 lock = threading.RLock()
+
+# the owner of runs started without login while authorization is off (start_markup)
+ANONYMOUS = Principal(owner="anon:markup", name="anonymous", sees_all=False)
 
 
 def now() -> str:
@@ -227,8 +230,11 @@ def _public(state: dict) -> dict:
 # --- requests
 
 @router.post("", status_code=202)
-def start_markup(request: Request, uid: str = Form(...), language: str = Form("he"), force: bool = Form(False),
-                 who: Principal = Depends(principal)):
+def start_markup(request: Request, uid: str = Form(...), language: str = Form("he"), force: bool = Form(False)):
+    # TODO: authorization is temporarily off, anyone may start a run (see TODO.md); to restore it put back
+    # `who: Principal = Depends(principal)` in the arguments
+    who = ANONYMOUS
+    request.state.note = f"uid={uid} language={language} force={force}"
     uid = _check_uid(uid)
     if language not in LANGUAGES:
         raise HTTPException(400, f"language: one of {', '.join(LANGUAGES)}")
@@ -256,6 +262,7 @@ def start_markup(request: Request, uid: str = Form(...), language: str = Form("h
                  "transcript": {"file_uid": transcript["id"]} if transcript else None,
                  "transcribe_job": job_id}
         save_state(state)
+    request.state.note += f" job={job_id}"
     log.info("markup %s: started by %s (job %s)", uid, who.name, job_id)
     return JSONResponse(_public(state), status_code=202)
 

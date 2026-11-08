@@ -21,6 +21,7 @@ from .. import protocol
 from ..subtitles import render
 from . import config, diarize, live, markup, results, review, tadiff
 from .auth import Principal, can_see, principal
+from .requestlog import RequestLog
 from .jobs import CANCELLED, DONE, ERROR, QUEUED, RUNNING, TRANSCRIBE, JobStore, kind_of
 from .submit import UPLOAD, clip_of, create_job as submit_job, job_view as view_of
 
@@ -81,6 +82,8 @@ if config.CORS_ORIGINS:
     app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS,
                        allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["*"],
                        expose_headers=["Content-Disposition", *results.STATS_HEADERS])
+# added last: the outermost layer, so it sees every request, CORS preflights and errors included
+app.add_middleware(RequestLog)
 app.include_router(review.router)
 app.include_router(tadiff.tadiff)
 app.include_router(tadiff.docdiff)

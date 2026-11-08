@@ -1,5 +1,7 @@
 """Lesson markup (ai_trns.markup, ai_trns.api.markup): chapters by the transcript's marks, paragraphs timed by the
 heard words, the transcribe -> diarize -> build chain driven by the server"""
+import json
+
 import pytest
 
 from ai_trns.api import markup as api
@@ -148,9 +150,16 @@ def diarize_doc(paras):
             "stats": {"speakers": 3, "named": 2}}
 
 
-def test_login_is_required_to_start_but_not_to_read(mc):
-    assert mc.post("/markup", data={"uid": "Unit0001"}).status_code == 401
+def test_no_login_to_start_or_read(mc, api_config):
+    # authorization is temporarily off for POST /markup (TODO.md)
     assert mc.get("/markup/Unit0001").status_code == 404
+    r = mc.post("/markup", data={"uid": "Unit0001"})
+    assert r.status_code == 202
+    # who started it is in the request log
+    with open(f"{api_config.LOG_DIR}/requests.log", encoding="utf-8") as f:
+        last = json.loads(f.readlines()[-1])
+    assert (last["path"], last["note"]) == \
+           ("/markup", f"uid=Unit0001 language=he force=False job={r.json()['transcribe_job']}")
     assert mc.get("/markup/bad").status_code == 400
     assert mc.post("/markup", headers=H, data={"uid": "Missing1"}).status_code == 404
 
