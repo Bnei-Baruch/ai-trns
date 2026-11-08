@@ -63,9 +63,8 @@
       задача). Новый файл в полночь, хранится `AI_TRNS_LOG_DAYS=7` дней.
       Задеплоено `ba9a68f` (2026-11-08), `AI_TRNS_LOG_DIR=/home/ai-trns/logs` в `ai-trns-api.env`, пишется (~25 строк
       в минуту, в основном опрос воркеров).
-- [ ] Angie на `ngx`, `location /ai-trns/`: нет `X-Real-IP` / `X-Forwarded-For` — в `ip` сейчас адрес `ngx`
-      (`10.77.1.211`). Добавить `proxy_set_header X-Real-IP $remote_addr;` и
-      `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` (как в `accounts.conf`), `angie -t`, reload.
+- [x] Angie на `ngx`, `location /ai-trns/`: добавлены `X-Real-IP $remote_addr` и `X-Forwarded-For` (2026-11-08,
+      бэкап `/root/ai-tools.conf.bak.20261108121010`) — в журнале настоящий IP клиента, `peer` — `ngx` (`10.77.1.211`).
 - [x] Клиент ai-tools: страница Transcription через API (`POST /jobs` с токеном Keycloak, опрос, скачивание)
       вместо exec-api + MQTT (2026-11-04, ai-tools PR #4 → master, задеплоено). exec-api удалён — `TASK-cleanup-old.md`.
 - [ ] URL-задачи с `cdn.kabbalahmedia.info`: прогнать настоящую ссылку.
