@@ -196,13 +196,13 @@ class Diarizer:
             embs.append(emb)
         return names, np.stack(embs) if embs else np.zeros((0, 0))
 
-    def _name_clusters(self, labels: list, centroids, samples: list[tuple[str, str]]) -> dict:
-        """{cluster: name} for the clusters matched to a voice sample"""
+    def _name_clusters(self, labels: list, centroids, samples: list[tuple[str, str]]) -> tuple[dict, list]:
+        """({cluster: name} for the clusters matched to a voice sample, how sure it is: mapping.voice_report)"""
         builtin = builtin_samples(self.speakers_dir)
         requested = {name for name, _ in samples}
         all_samples = [s for s in builtin if s[0] not in requested] + list(samples)
         if not all_samples or not labels:
-            return {}
+            return {}, []
         if centroids is None:
             raise ValueError("this diarization pipeline returns no speaker embeddings; samples unsupported")
         names, sample_embs = self._sample_embeddings(all_samples, {p for _, p in builtin})
@@ -210,7 +210,8 @@ class Diarizer:
         speakers, sim = mapping.best_per_speaker(names, sim)
         log.info("speaker/cluster similarity (%s): %s", speakers, np.round(sim, 3).tolist())
         matched = mapping.match_samples(sim, MATCH_THRESHOLD, self.extra_threshold)
-        return {labels[c]: speakers[s] for c, s in matched.items()}
+        return {labels[c]: speakers[s] for c, s in matched.items()}, \
+            mapping.voice_report(speakers, sim, matched, MATCH_THRESHOLD)
 
     # --- word timings
 
@@ -295,7 +296,7 @@ class Diarizer:
         turns, labels, centroids = self._diarize(waveform, speaker_kwargs, hook)
         log.info("diarized: %d turns, %d clusters", len(turns), len(labels))
         lap("speakers")
-        named = self._name_clusters(labels, centroids, samples)
+        named, voices = self._name_clusters(labels, centroids, samples)
         lap("samples")
 
         lang_code = UROMAN_LANGS.get(lang, "heb")
@@ -329,5 +330,6 @@ class Diarizer:
             "words": [{"word": w["word"], "start": round(w["start"], 3), "end": round(w["end"], 3),
                        "speaker": names.get(c), "cue": cue_idx} for w, c, cue_idx in labeled],
             "stats": {"speakers": len(set(names.values())), "named": len(named),
-                      "mixed_cues": mixed_cues, "vad_fallback_cues": fallback, "seconds": seconds},
+                      "mixed_cues": mixed_cues, "vad_fallback_cues": fallback, "seconds": seconds,
+                      "voices": voices, "uncertain_voices": sum(v["uncertain"] for v in voices)},
         }

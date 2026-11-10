@@ -149,6 +149,29 @@ def match_samples(similarity: np.ndarray, threshold: float,
     return matched
 
 
+def voice_report(speakers: list[str], similarity: np.ndarray, matched: dict[int, int], threshold: float,
+                 margin: float = 0.1) -> list[dict]:
+    """How sure the naming is, per speaker with voice samples: [{"speaker", "similarity": of its cluster (the
+    closest one if none was named), "named", "next": the closest cluster of nobody else, "uncertain"}].
+    Uncertain: named or not by less than margin, or another cluster would pass the threshold too (one voice
+    that diarization split in two: the other half stays anonymous). matched: match_samples' answer"""
+    report = []
+    for s, name in enumerate(speakers):
+        row = similarity[s]
+        if not row.size:
+            continue
+        own = [c for c, r in matched.items() if r == s] or [int(np.argmax(row))]
+        named = any(matched.get(c) == s for c in own)
+        best = float(max(row[c] for c in own))
+        free = [float(row[c]) for c in range(row.size) if c not in own and c not in matched]
+        nxt = max(free) if free else None
+        uncertain = (best < threshold + margin) if named else (best >= threshold - margin)
+        report.append({"speaker": name, "similarity": round(best, 3), "named": named,
+                       "next": None if nxt is None else round(nxt, 3),
+                       "uncertain": bool(uncertain or (named and nxt is not None and nxt >= threshold))})
+    return report
+
+
 def best_per_speaker(names: list[str], similarity: np.ndarray) -> tuple[list[str], np.ndarray]:
     """Collapses several samples of the same speaker into one row: a
     speaker's similarity to a cluster is that of its closest sample.

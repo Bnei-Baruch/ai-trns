@@ -340,3 +340,16 @@ def test_the_service_generates_no_more_than_a_chunks_longest_answer():
     # "[10, 11, 12, 13, 14]": 20 tokens here, and a few to end the answer
     assert answer_budget(tokenizer, range(10, 15), 2048) == 28
     assert answer_budget(tokenizer, range(0, 2000), 2048) == 2048
+
+
+def test_of_two_starts_too_close_the_one_after_the_longer_pause_can_be_kept():
+    doc = doc_of([(f"w{i}", "Rav") for i in range(12)])
+    words = doc["words"]
+    # words are 0.5 s apart; a 3 s pause before word 6
+    for w in words[6:]:
+        w["start"], w["end"] = w["start"] + 3, w["end"] + 3
+    assert build.thin_starts(words, [4, 6, 11], 4) == [4, 11]
+    assert build.thin_starts(words, [4, 6, 11], 4, by_pause=True) == [6, 11]
+    # a turn's start is not a model start: nothing takes its place
+    assert build.thin_starts(words, [2, 6], 4, by_pause=True) == [6]
+    assert build.thin_starts(words, [6, 8], 4, by_pause=True) == [6]

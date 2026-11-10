@@ -377,3 +377,22 @@ def test_check_refuses_other_documents():
     for bad in ({"words": []}, _doc(("a", 1.0, 0.5, None, 0)), {"kind": "diarize", "words": [{"word": "a"}]}):
         with pytest.raises((ValueError, KeyError)):
             labels.check(bad)
+
+
+def test_voice_report_flags_names_that_are_not_sure():
+    import numpy as np
+    speakers = ["Rav", "Reader"]
+
+    def report(rows, threshold=0.5):
+        sim = np.array(rows)
+        return mapping.voice_report(speakers, sim, mapping.match_samples(sim, threshold), threshold)
+
+    # Rav clearly cluster 0, nobody like the reader
+    assert report([[0.8, 0.2, 0.1], [0.1, 0.2, 0.1]]) == [
+        {"speaker": "Rav", "similarity": 0.8, "named": True, "next": 0.2, "uncertain": False},
+        {"speaker": "Reader", "similarity": 0.2, "named": False, "next": 0.1, "uncertain": False}]
+    # named by a hair; not named by a hair (0.489 on a real lesson)
+    assert [v["uncertain"] for v in report([[0.55, 0.1], [0.1, 0.489]])] == [True, True]
+    # a second cluster would pass too: one voice split in two
+    rav = report([[0.8, 0.53, 0.1], [0.0, 0.0, 0.0]])[0]
+    assert (rav["named"], rav["next"], rav["uncertain"]) == (True, 0.53, True)

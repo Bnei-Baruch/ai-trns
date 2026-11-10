@@ -18,7 +18,7 @@ import time
 from typing import Optional
 
 from .. import audio, clip, protocol
-from . import config
+from . import config, wavcache
 from .client import ApiError, Client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -200,7 +200,8 @@ def add_paragraphs(doc: dict) -> None:
     # the whole call, the model's loading included (the service's own "seconds" is the generation only)
     stats.setdefault("seconds", {})["paragraphs"] = round(time.time() - t0, 1)
     starts = build.starts_from_sentences(index, offsets, reply["sentences"], reply["breaks"])
-    doc["paragraph_starts"] = build.thin_starts(doc["words"], starts, config.PARAGRAPHS_MIN_WORDS)
+    doc["paragraph_starts"] = build.thin_starts(doc["words"], starts, config.PARAGRAPHS_MIN_WORDS,
+                                                 config.PARAGRAPHS_BY_PAUSE)
     doc["paragraphs_model"] = "mdb-lora " + (reply.get("adapter") or "paragraphing")
     log.info("paragraphs: %d breaks in %s s", len(doc["paragraph_starts"]), reply.get("seconds"))
 
@@ -295,18 +296,26 @@ def run_locally(client: Client, models: Models, job: dict, job_dir: str, beat: "
         client.download(job["source"]["upload"], source)
     else:
         source = job["source"]["url"]
-    duration = audio.get_duration(source)
-    if duration == 0:
-        raise RuntimeError("could not determine audio duration")
-    # a clip: only its part of the audio; the document in media time
-    window = clip.window(params["clip"], duration) if params.get("clip") else None
-    start, end = window or (0.0, duration)
     wav_file = os.path.join(job_dir, "audio.wav")
-    if not audio.convert_to_wav(source, wav_file, end - start,
-                                lambda p: beat.update("converting", CONVERT_SHARE * p),
-                                beat.cancelled.is_set, start=start, length=end - start if window else None):
-        log.info("job %s cancelled", job_id)
-        return None
+    # whole media by its URL: another worker of this host may have converted it already
+    shared = config.AUDIO_CACHE_DIR if "url" in job["source"] and not params.get("clip") else ""
+    if shared and wavcache.take(shared, source, wav_file, config.AUDIO_CACHE_S):
+        log.info("job %s: audio already converted by another job", job_id)
+        window, start = None, 0.0
+    else:
+        duration = audio.get_duration(source)
+        if duration == 0:
+            raise RuntimeError("could not determine audio duration")
+        # a clip: only its part of the audio; the document in media time
+        window = clip.window(params["clip"], duration) if params.get("clip") else None
+        start, end = window or (0.0, duration)
+        if not audio.convert_to_wav(source, wav_file, end - start,
+                                    lambda p: beat.update("converting", CONVERT_SHARE * p),
+                                    beat.cancelled.is_set, start=start, length=end - start if window else None):
+            log.info("job %s cancelled", job_id)
+            return None
+        if shared:
+            wavcache.put(shared, source, wav_file, config.AUDIO_CACHE_S)
     from ..transcriber import Cancelled
     try:
         if params.get("kind") == DIARIZE:

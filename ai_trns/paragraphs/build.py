@@ -167,9 +167,10 @@ def starts_from_sentences(index: list[int], offsets: list[int], sentences: list[
     return sorted(out)
 
 
-def thin_starts(words: list[dict], starts: Iterable[int], min_words: int) -> list[int]:
+def thin_starts(words: list[dict], starts: Iterable[int], min_words: int, by_pause: bool = False) -> list[int]:
     """Paragraph starts at least min_words words after the start before them in the same turn (or the turn's start);
-    the others dropped, earliest kept first. min_words <= 0: all kept"""
+    the others dropped, earliest kept first. by_pause: of two starts too close, the one after the longer pause
+    is kept instead (a turn's start always stays). min_words <= 0: all kept"""
     starts = sorted(set(starts))
     if min_words <= 0:
         return starts
@@ -185,7 +186,15 @@ def thin_starts(words: list[dict], starts: Iterable[int], min_words: int) -> lis
         if i - last.get(t, t) >= min_words:
             out.append(i)
             last[t] = i
+        elif by_pause and t in last and _pause(words, i) > _pause(words, last[t]):
+            # last[t] is the start kept last (starts come in order): this one takes its place
+            out[-1] = last[t] = i
     return out
+
+
+def _pause(words: list[dict], i: int) -> float:
+    """Silence before word i"""
+    return words[i]["start"] - words[i - 1]["end"] if i else 0.0
 
 
 def paragraphs(doc: dict, source: Optional[str] = None) -> dict:
@@ -219,4 +228,8 @@ def paragraphs(doc: dict, source: Optional[str] = None) -> dict:
              "reader_turns": len(readers), "reading_words": sum(reading)}
     if (doc.get("stats") or {}).get("paragraphs_error"):
         stats["paragraphs_error"] = doc["stats"]["paragraphs_error"]
+    # how sure the speakers' names are (ai_trns.diarize.mapping.voice_report)
+    for key in ("voices", "uncertain_voices"):
+        if key in (doc.get("stats") or {}):
+            stats[key] = doc["stats"][key]
     return {"paragraphs": out, "stats": stats}

@@ -161,14 +161,15 @@ def thin(lesson, starts, k):
     return out
 
 
-def adapter(lesson, preds, k=0, **_):
+def adapter(lesson, preds, k=0, pause=False, **_):
     p = preds.get(lesson.id)
     if p is None:
         raise KeyError(f"no adapter answer for {lesson.id}")
     if p["sentences"] != lesson.sentences:
         raise ValueError(f"{lesson.id}: sentences differ from the adapter's")
     starts = build.starts_from_sentences(lesson.index, lesson.offsets, p["sentences"], p["breaks"])
-    return set(build.thin_starts(lesson.words, starts, k))  # as the worker does (AI_TRNS_PARAGRAPHS_MIN_WORDS)
+    # as the worker does (AI_TRNS_PARAGRAPHS_MIN_WORDS, AI_TRNS_PARAGRAPHS_BY_PAUSE)
+    return set(build.thin_starts(lesson.words, starts, k, pause))
 
 
 def _cos(a, b):
@@ -295,11 +296,13 @@ def grid_specs(d, ids, merges, adapters):
             if load_preds(d, a, merge) is not None:
                 for k in (0, 10, 20, 30, 40, 50, 60, 80):
                     yield merge, "adapter", {"name": a, "k": k}
+                    if k:
+                        yield merge, "adapter", {"name": a, "k": k, "pause": True}
 
 
 def label(method, params):
     if method == "adapter":
-        return f"adapter {params['name']} k={params['k']}"
+        return f"adapter {params['name']} k={params['k']}" + (" by pause" if params.get("pause") else "")
     return method + (" " + " ".join(f"{k}={v}" for k, v in params.items()) if params else "")
 
 
