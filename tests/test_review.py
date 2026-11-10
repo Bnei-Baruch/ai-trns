@@ -154,6 +154,8 @@ def test_results(rc):
 
 def test_baseline_is_hidden_from_reviewers(rc):
     seg = ready(rc)
+    # the finished job's outcome is written in first (the API does it as soon as the job is done)
+    assert rc.get(SET, headers=token(ALICE)).json()["segments"][0]["status"] == "ready"
     review.save_segment("set1", {**review.load_segment("set1", seg), "baseline_chunks": [{"start": 0, "end": 1, "text": "b"}]})
     assert "baseline_chunks" not in rc.get(SET, headers=token(ALICE)).json()["segments"][0]
     assert "baseline_chunks" in rc.get(f"{SET}/results", headers=token(ALICE)).json()["set"]["segments"][0]

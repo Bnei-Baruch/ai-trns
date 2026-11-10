@@ -118,6 +118,7 @@ def test_the_worker_adds_the_services_paragraph_starts(service, monkeypatch):
     # sentences 1 and 3 start paragraphs: "היום" (word 2) and "עוד" (word 6)
     assert doc["paragraph_starts"] == [2, 6]
     assert "paragraphs_error" not in doc["stats"]
+    assert doc["stats"]["seconds"]["paragraphs"] >= 0
     # AI_TRNS_PARAGRAPHS_MIN_WORDS: a start too close to the one before it (or to its turn's start) is dropped
     monkeypatch.setattr(config, "PARAGRAPHS_MIN_WORDS", 2)
     doc = doc_of(LESSON)
@@ -328,3 +329,14 @@ def test_the_reader_is_the_voice_that_announces_the_reading():
     doc = doc_of(announce + RAV + more + RAV + relayed + RAV + asks)
     assert [p["label"] for p in build.paragraphs(doc)["paragraphs"]] == [
         "קריין", "הרב", "קריין", "הרב", "תלמיד", "הרב", "תלמיד"]
+
+
+def test_the_service_generates_no_more_than_a_chunks_longest_answer():
+    from ai_trns.paragraphs.service import answer_budget
+
+    def tokenizer(text, add_special_tokens=True):
+        return {"input_ids": list(text)}
+
+    # "[10, 11, 12, 13, 14]": 20 tokens here, and a few to end the answer
+    assert answer_budget(tokenizer, range(10, 15), 2048) == 28
+    assert answer_budget(tokenizer, range(0, 2000), 2048) == 2048

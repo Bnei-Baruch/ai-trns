@@ -43,10 +43,16 @@ async def lifespan(app: FastAPI):
     store = JobStore()
     hubs = live.Live()
     stop = threading.Event()
+    # set when a job finishes: the chains (review, markup) move on now, not at the next tick
+    wake = threading.Event()
 
     def maintenance():
         last_cleanup = 0.0
-        while not stop.wait(timeout=protocol.HEARTBEAT_S):
+        while True:
+            wake.wait(timeout=protocol.HEARTBEAT_S)
+            wake.clear()
+            if stop.is_set():
+                break
             for job_id in store.expire_leases(config.MAX_ATTEMPTS):
                 job = store.get(job_id)
                 log.warning("job %s: lease expired, now %s", job_id, job["status"])
@@ -72,8 +78,10 @@ async def lifespan(app: FastAPI):
     app.state.store = store
     app.state.live = hubs
     app.state.workers = {}
+    app.state.wake = wake
     yield
     stop.set()
+    wake.set()
 
 
 app = FastAPI(title="ai-trns", lifespan=lifespan)
@@ -237,7 +245,9 @@ def worker_lease(body: dict = Body(...)):
     seen(worker, langs=langs, engines=engines, job=None)
     job = app.state.store.lease(worker, langs, protocol.LEASE_S, engines)
     if job is None:
-        return Response(status_code=204)
+        # jobs are queued for other workers: this one may be holding the GPU they wait for
+        waiting = {protocol.WAITING_HEADER: "1"} if app.state.store.queued_ids() else {}
+        return Response(status_code=204, headers=waiting)
     seen(worker, job=job["id"])
     log.info("job %s leased to %s (attempt %d)", job["id"], worker, job["attempts"])
     if live.is_live(job):
@@ -312,6 +322,7 @@ def worker_result(job_id: str, worker: str, doc: dict = Body(...)):
     drop_upload(job_id)
     app.state.live.publish(job_id, {"type": "end", "duration_s": doc.get("duration_s")})
     log.info("job %s done by %s", job_id, worker)
+    app.state.wake.set()
     return {"ok": True}
 
 

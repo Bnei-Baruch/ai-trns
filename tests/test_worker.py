@@ -184,3 +184,32 @@ def test_a_result_is_sent_again_while_the_api_restarts(monkeypatch):
     with pytest.raises(w.ApiError):
         w.send_result(RejectingClient(), "j2", {})
     assert calls == ["j2"]
+
+
+def test_a_worker_sharing_its_gpu_frees_it_for_the_jobs_of_others(server, worker, audio_file, monkeypatch):
+    import httpx
+    from ai_trns.worker import __main__ as w
+    from ai_trns.worker import config
+    from tests.test_tools import SRT
+    unloads = []
+    monkeypatch.setattr(w.Models, "unload", lambda self: unloads.append(time.time()))
+    monkeypatch.setattr(w, "free_gpu_mb", lambda: 8000)
+    monkeypatch.setattr(config, "MIN_FREE_GPU_MB", 4000)
+    time.sleep(0.5)
+    # nothing queued: the model stays until its idle time
+    assert not unloads
+    with httpx.Client(base_url=server) as http, open(audio_file, "rb") as f:
+        # a diarize job, which this transcribe worker cannot take
+        job_id = http.post("/diarize/srt", headers=H,
+                           files=[("audio", ("in.mp3", f)), ("srt", ("a.srt", SRT.encode()))]).json()["id"]
+        deadline = time.time() + 10
+        while not unloads and time.time() < deadline:
+            time.sleep(0.05)
+        assert unloads
+        assert http.get(f"/jobs/{job_id}", headers=H).json()["status"] == "queued"
+        # a GPU of its own (no AI_TRNS_MIN_FREE_GPU_MB): nobody waits for its memory
+        monkeypatch.setattr(config, "MIN_FREE_GPU_MB", 0)
+        time.sleep(0.3)
+        count = len(unloads)
+        time.sleep(0.5)
+        assert len(unloads) == count

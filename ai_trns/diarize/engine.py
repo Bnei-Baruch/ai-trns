@@ -16,6 +16,7 @@ Needs requirements-diarize.txt and a HuggingFace token with access to the pyanno
 """
 import logging
 import os
+import time
 from typing import Callable, Optional
 
 import numpy as np
@@ -280,12 +281,22 @@ class Diarizer:
             part = completed / total if total and completed is not None else 1.0
             on_progress(DIARIZE_SHARE * min(1.0, (i + part) / len(PYANNOTE_STEPS)))
 
+        # seconds of each stage, into the document's stats: where a job's time goes
+        seconds, mark = {}, time.time()
+
+        def lap(stage: str):
+            nonlocal mark
+            seconds[stage], mark = round(time.time() - mark, 1), time.time()
+
         pcm = audio.load_pcm(wav_file)
         waveform = self.torch.from_numpy(pcm.copy())
+        lap("audio")
         speaker_kwargs = {k: v for k, v in (speakers or {}).items() if v is not None}
         turns, labels, centroids = self._diarize(waveform, speaker_kwargs, hook)
         log.info("diarized: %d turns, %d clusters", len(turns), len(labels))
+        lap("speakers")
         named = self._name_clusters(labels, centroids, samples)
+        lap("samples")
 
         lang_code = UROMAN_LANGS.get(lang, "heb")
         labeled = []
@@ -306,6 +317,7 @@ class Diarizer:
             else:
                 labeled.extend((w, cluster, cue_idx) for w in words)
         log.info("words: %d, ctc failed on %d of %d cues", len(labeled), fallback, len(cues))
+        lap("align")
 
         names = mapping.speaker_names([c for _, c, _ in labeled if c is not None], named)
         return {
@@ -317,5 +329,5 @@ class Diarizer:
             "words": [{"word": w["word"], "start": round(w["start"], 3), "end": round(w["end"], 3),
                        "speaker": names.get(c), "cue": cue_idx} for w, c, cue_idx in labeled],
             "stats": {"speakers": len(set(names.values())), "named": len(named),
-                      "mixed_cues": mixed_cues, "vad_fallback_cues": fallback},
+                      "mixed_cues": mixed_cues, "vad_fallback_cues": fallback, "seconds": seconds},
         }

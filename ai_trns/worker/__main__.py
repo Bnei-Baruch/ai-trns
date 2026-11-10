@@ -190,12 +190,15 @@ def add_paragraphs(doc: dict) -> None:
     if not text:
         doc["paragraph_starts"] = []
         return
+    t0 = time.time()
     try:
         reply = client.split(config.PARAGRAPHS_URL, text, config.PARAGRAPHS_KEY)
     except RuntimeError as e:
         log.warning("paragraphs: %s", e)
         stats["paragraphs_error"] = str(e)
         return
+    # the whole call, the model's loading included (the service's own "seconds" is the generation only)
+    stats.setdefault("seconds", {})["paragraphs"] = round(time.time() - t0, 1)
     starts = build.starts_from_sentences(index, offsets, reply["sentences"], reply["breaks"])
     doc["paragraph_starts"] = build.thin_starts(doc["words"], starts, config.PARAGRAPHS_MIN_WORDS)
     doc["paragraphs_model"] = "mdb-lora " + (reply.get("adapter") or "paragraphing")
@@ -324,6 +327,12 @@ def run_locally(client: Client, models: Models, job: dict, job_dir: str, beat: "
     return doc
 
 
+def stage_seconds(doc: dict) -> str:
+    """For the log: the seconds of each stage a document's stats have (a diarize job's)"""
+    seconds = (doc.get("stats") or {}).get("seconds") or {}
+    return "".join(f", {stage} {s:.0f} s" for stage, s in seconds.items())
+
+
 RESULT_TRIES, RESULT_RETRY_S = 6, 10.0
 
 
@@ -345,6 +354,7 @@ def run_job(client: Client, models: Models, job: dict, shutdown: Optional[thread
     job_id, params = job["id"], job["params"]
     job_dir = os.path.join(config.WORK_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
+    t0 = time.time()
     try:
         with Heartbeat(client, job_id) as beat:
             if params.get("kind") == LIVE:
@@ -362,7 +372,8 @@ def run_job(client: Client, models: Models, job: dict, shutdown: Optional[thread
         if doc is None:
             return
         send_result(client, job_id, doc)
-        log.info("job %s done: %.0f s of audio, %d words", job_id, doc["duration_s"], len(doc["words"]))
+        log.info("job %s done in %.0f s: %.0f s of audio, %d words%s", job_id, time.time() - t0, doc["duration_s"],
+                 len(doc["words"]), stage_seconds(doc))
     except ApiError as e:
         # 409: the job was cancelled or given to another worker meanwhile; nothing to report
         log.warning("job %s: %s", job_id, e)
@@ -410,7 +421,12 @@ def main(stop: Optional[threading.Event] = None):
                 # wrong key or protocol version: retrying fast will not help
                 stop.wait(60)
         if job is None:
-            models.unload_if_idle()
+            if client.jobs_waiting and config.MIN_FREE_GPU_MB > 0:
+                # the GPU is shared (AI_TRNS_MIN_FREE_GPU_MB) and others' jobs are queued: they may be
+                # waiting for this worker's memory, e.g. the diarize job that follows a transcription
+                models.unload()
+            else:
+                models.unload_if_idle()
             stop.wait(config.POLL_S)
             continue
         params = job["params"]
