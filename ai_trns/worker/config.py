@@ -24,6 +24,9 @@ HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
 # pyannote into several clusters); unset = one cluster per speaker (ai_trns.diarize.mapping.match_samples)
 DIARIZE_EXTRA_THRESHOLD = float(os.environ["AI_TRNS_DIARIZE_EXTRA_THRESHOLD"]) \
     if os.environ.get("AI_TRNS_DIARIZE_EXTRA_THRESHOLD", "").strip() else None
+# pyannote's segmentation step as a share of its window; unset = the pipeline's own (0.1). 0.2 halves pyannote's
+# time (ai_trns.diarize.engine.Diarizer._set_step; measured in TASK-speakers-paragraphs.md)
+DIARIZE_STEP = float(os.environ["AI_TRNS_DIARIZE_STEP"]) if os.environ.get("AI_TRNS_DIARIZE_STEP", "").strip() else None
 # diarize jobs asked for paragraphs: the paragraphing service (ai_trns.paragraphs.service, mdb-lora on `stt`)
 # and its key; unset = speaker turns only
 PARAGRAPHS_URL = os.environ.get("AI_TRNS_PARAGRAPHS_URL", "").rstrip("/")

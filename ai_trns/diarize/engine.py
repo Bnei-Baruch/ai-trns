@@ -120,7 +120,8 @@ class Diarizer:
     """pyannote pipeline, MMS_FA aligner and uroman, loaded once; parameters are passed per call"""
 
     def __init__(self, speakers_dir: str, device: str = "cuda", pipeline: str = PIPELINE,
-                 hf_token: Optional[str] = None, extra_threshold: Optional[float] = MATCH_EXTRA_THRESHOLD):
+                 hf_token: Optional[str] = None, extra_threshold: Optional[float] = MATCH_EXTRA_THRESHOLD,
+                 step: Optional[float] = None):
         import torch
         import torchaudio
         import uroman
@@ -138,6 +139,8 @@ class Diarizer:
             raise RuntimeError(f"Could not load {pipeline}: check HF_TOKEN and that its license is accepted on HF")
         self.pipeline.to(self.device)
         self.pipeline_name = pipeline
+        if step:
+            self._set_step(step)
 
         bundle = torchaudio.pipelines.MMS_FA
         self.mms = bundle.get_model(with_star=False).to(self.device)
@@ -149,6 +152,17 @@ class Diarizer:
         self.builtin_embeddings = {}
 
     # --- speakers
+
+    def _set_step(self, step: float):
+        """pyannote slides a window over the audio and embeds every speaker in every position: nearly all of its
+        time. step: the slide as a share of the window (the pipeline's own: 0.1); twice the step = half the time"""
+        inference = getattr(self.pipeline, "_segmentation", None)
+        if inference is None or not hasattr(inference, "step") or not hasattr(inference, "duration"):
+            raise RuntimeError("this pyannote pipeline has no segmentation step to set (AI_TRNS_DIARIZE_STEP)")
+        if not 0 < step <= 0.5:
+            raise ValueError("AI_TRNS_DIARIZE_STEP: a share of the window, above 0 and up to 0.5")
+        inference.step = step * inference.duration
+        log.info("segmentation step %.2f of the window (%.1f s)", step, inference.step)
 
     def _diarize(self, waveform, speaker_kwargs: dict, hook):
         """-> (turns, cluster_labels, centroids) where centroids[i] belongs to cluster_labels[i]"""
