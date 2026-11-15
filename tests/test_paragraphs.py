@@ -118,6 +118,7 @@ def test_the_worker_adds_the_services_paragraph_starts(service, monkeypatch):
     # sentences 1 and 3 start paragraphs: "היום" (word 2) and "עוד" (word 6)
     assert doc["paragraph_starts"] == [2, 6]
     assert "paragraphs_error" not in doc["stats"]
+    assert doc["stats"]["seconds"]["paragraphs"] >= 0
     # AI_TRNS_PARAGRAPHS_MIN_WORDS: a start too close to the one before it (or to its turn's start) is dropped
     monkeypatch.setattr(config, "PARAGRAPHS_MIN_WORDS", 2)
     doc = doc_of(LESSON)
@@ -328,3 +329,27 @@ def test_the_reader_is_the_voice_that_announces_the_reading():
     doc = doc_of(announce + RAV + more + RAV + relayed + RAV + asks)
     assert [p["label"] for p in build.paragraphs(doc)["paragraphs"]] == [
         "קריין", "הרב", "קריין", "הרב", "תלמיד", "הרב", "תלמיד"]
+
+
+def test_the_service_generates_no_more_than_a_chunks_longest_answer():
+    from ai_trns.paragraphs.service import answer_budget
+
+    def tokenizer(text, add_special_tokens=True):
+        return {"input_ids": list(text)}
+
+    # "[10, 11, 12, 13, 14]": 20 tokens here, and a few to end the answer
+    assert answer_budget(tokenizer, range(10, 15), 2048) == 28
+    assert answer_budget(tokenizer, range(0, 2000), 2048) == 2048
+
+
+def test_of_two_starts_too_close_the_one_after_the_longer_pause_can_be_kept():
+    doc = doc_of([(f"w{i}", "Rav") for i in range(12)])
+    words = doc["words"]
+    # words are 0.5 s apart; a 3 s pause before word 6
+    for w in words[6:]:
+        w["start"], w["end"] = w["start"] + 3, w["end"] + 3
+    assert build.thin_starts(words, [4, 6, 11], 4) == [4, 11]
+    assert build.thin_starts(words, [4, 6, 11], 4, by_pause=True) == [6, 11]
+    # a turn's start is not a model start: nothing takes its place
+    assert build.thin_starts(words, [2, 6], 4, by_pause=True) == [6]
+    assert build.thin_starts(words, [6, 8], 4, by_pause=True) == [6]

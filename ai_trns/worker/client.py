@@ -21,6 +21,8 @@ class Client:
         self.worker = worker
         self.timeout = timeout
         self.headers = {protocol.KEY_HEADER: key, protocol.VERSION_HEADER: str(protocol.VERSION)}
+        # by the last lease: jobs are queued that this worker cannot take
+        self.jobs_waiting = False
 
     def _request(self, method: str, path: str, body=None, timeout: Optional[float] = None):
         data = None
@@ -44,7 +46,12 @@ class Client:
         return f"?worker={quote(self.worker)}"
 
     def lease(self, langs: list, engines: list) -> Optional[dict]:
-        return self._json("POST", "/worker/lease", {"worker": self.worker, "langs": langs, "engines": engines})
+        body = {"worker": self.worker, "langs": langs, "engines": engines}
+        with self._request("POST", "/worker/lease", body) as response:
+            self.jobs_waiting = response.headers.get(protocol.WAITING_HEADER) == "1"
+            if response.status == 204:
+                return None
+            return json.loads(response.read())
 
     def download(self, path: str, dest: str):
         """The job's uploaded audio (its source's "upload" path) or another input (file_path)"""

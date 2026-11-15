@@ -49,6 +49,14 @@ def _mdb_lora_on_path():
             sys.path.insert(0, path)
 
 
+def answer_budget(tokenizer, ids: range, limit: int) -> int:
+    """Tokens to generate for a chunk: enough for its longest answer (every sentence a paragraph start) and a
+    few to end it. On a short text the model sometimes does not stop after its answer and writes up to the
+    limit: minutes for a few sentences"""
+    longest = json.dumps(list(ids))
+    return min(limit, len(tokenizer(longest, add_special_tokens=False)["input_ids"]) + 8)
+
+
 class Model:
     """The loaded generator, or None; a lock makes requests take turns"""
 
@@ -87,6 +95,7 @@ class Model:
             sentences, chunks = build_chunks(flat, self.gen.tokenizer, self.cfg["task"]["chunk_max_tokens"])
             breaks, unparsed = set(), 0
             for ids, chunk in chunks:
+                self.gen.max_new_tokens = answer_budget(self.gen.tokenizer, ids, MAX_NEW_TOKENS)
                 ids_found = parse_answer(self.gen.generate(chunk))
                 if ids_found is None:
                     unparsed += 1

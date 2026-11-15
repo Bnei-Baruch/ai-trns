@@ -184,3 +184,84 @@ def test_a_result_is_sent_again_while_the_api_restarts(monkeypatch):
     with pytest.raises(w.ApiError):
         w.send_result(RejectingClient(), "j2", {})
     assert calls == ["j2"]
+
+
+def test_a_worker_sharing_its_gpu_frees_it_for_the_jobs_of_others(server, worker, audio_file, monkeypatch):
+    import httpx
+    from ai_trns.worker import __main__ as w
+    from ai_trns.worker import config
+    from tests.test_tools import SRT
+    unloads = []
+    monkeypatch.setattr(w.Models, "unload", lambda self: unloads.append(time.time()))
+    monkeypatch.setattr(w, "free_gpu_mb", lambda: 8000)
+    monkeypatch.setattr(config, "MIN_FREE_GPU_MB", 4000)
+    time.sleep(0.5)
+    # nothing queued: the model stays until its idle time
+    assert not unloads
+    with httpx.Client(base_url=server) as http, open(audio_file, "rb") as f:
+        # a diarize job, which this transcribe worker cannot take
+        job_id = http.post("/diarize/srt", headers=H,
+                           files=[("audio", ("in.mp3", f)), ("srt", ("a.srt", SRT.encode()))]).json()["id"]
+        deadline = time.time() + 10
+        while not unloads and time.time() < deadline:
+            time.sleep(0.05)
+        assert unloads
+        assert http.get(f"/jobs/{job_id}", headers=H).json()["status"] == "queued"
+        # a GPU of its own (no AI_TRNS_MIN_FREE_GPU_MB): nobody waits for its memory
+        monkeypatch.setattr(config, "MIN_FREE_GPU_MB", 0)
+        time.sleep(0.3)
+        count = len(unloads)
+        time.sleep(0.5)
+        assert len(unloads) == count
+
+
+def test_a_media_url_is_converted_once_for_the_workers_of_a_host(tmp_path, monkeypatch):
+    import os
+    from ai_trns import audio
+    from ai_trns.worker import __main__ as w
+    from ai_trns.worker import config, wavcache
+    monkeypatch.setattr(config, "AUDIO_CACHE_DIR", str(tmp_path / "cache"))
+    converted = []
+
+    def convert(source, wav_file, *args, **kwargs):
+        converted.append(source)
+        with open(wav_file, "wb") as f:
+            f.write(b"wav of " + source.encode())
+        return True
+
+    monkeypatch.setattr(audio, "get_duration", lambda source: 4.0)
+    monkeypatch.setattr(audio, "convert_to_wav", convert)
+    seen = []
+
+    class Transcriber:
+        def transcribe(self, wav_file, **kwargs):
+            seen.append(open(wav_file, "rb").read())
+            return words_doc()
+
+    monkeypatch.setattr(w.Models, "get", lambda self, lang: Transcriber())
+
+    class Beat:
+        cancelled = threading.Event()
+
+        def update(self, stage, progress):
+            pass
+
+    def run(name, url, **params):
+        job_dir = tmp_path / name
+        job_dir.mkdir()
+        job = {"id": name, "params": {"lang": "he", "formats": ["json"], **params}, "source": {"url": url}}
+        assert w.run_locally(None, w.Models(), job, str(job_dir), Beat()) is not None
+
+    run("a", "https://cdn/x.mp3")
+    run("b", "https://cdn/x.mp3")
+    assert converted == ["https://cdn/x.mp3"] and seen == [b"wav of https://cdn/x.mp3"] * 2
+    # another URL, a clip, an old file: converted
+    run("c", "https://cdn/y.mp3")
+    run("d", "https://cdn/x.mp3", clip={"start": 1.0, "end": 2.0})
+    assert len(converted) == 3
+    for name in os.listdir(tmp_path / "cache"):
+        os.utime(tmp_path / "cache" / name, (0, 0))
+    run("e", "https://cdn/x.mp3")
+    assert len(converted) == 4 and len(os.listdir(tmp_path / "cache")) == 1
+    # a cache that cannot be written does not fail the job
+    wavcache.put("/dev/null/no", "u", str(tmp_path / "a" / "audio.wav"), 900)

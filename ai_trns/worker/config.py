@@ -24,6 +24,9 @@ HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
 # pyannote into several clusters); unset = one cluster per speaker (ai_trns.diarize.mapping.match_samples)
 DIARIZE_EXTRA_THRESHOLD = float(os.environ["AI_TRNS_DIARIZE_EXTRA_THRESHOLD"]) \
     if os.environ.get("AI_TRNS_DIARIZE_EXTRA_THRESHOLD", "").strip() else None
+# pyannote's segmentation step as a share of its window; unset = the pipeline's own (0.1). 0.2 halves pyannote's
+# time (ai_trns.diarize.engine.Diarizer._set_step; measured in TASK-speakers-paragraphs.md)
+DIARIZE_STEP = float(os.environ["AI_TRNS_DIARIZE_STEP"]) if os.environ.get("AI_TRNS_DIARIZE_STEP", "").strip() else None
 # diarize jobs asked for paragraphs: the paragraphing service (ai_trns.paragraphs.service, mdb-lora on `stt`)
 # and its key; unset = speaker turns only
 PARAGRAPHS_URL = os.environ.get("AI_TRNS_PARAGRAPHS_URL", "").rstrip("/")
@@ -31,6 +34,9 @@ PARAGRAPHS_KEY = os.environ.get("AI_TRNS_PARAGRAPHS_KEY", "")
 # A model paragraph start closer than this many words to the one before it (or to its turn's start) is dropped:
 # on ASR text the model splits ~2x more often than the editors (TASK-paragraphs.md); 0 = every start kept
 PARAGRAPHS_MIN_WORDS = int(os.environ.get("AI_TRNS_PARAGRAPHS_MIN_WORDS", "0") or 0)
+# Of two starts closer than that, keep the one after the longer pause, not the earlier one. Off until measured
+# (scripts/paragraphs_eval/methods.py, adapter with "pause": true)
+PARAGRAPHS_BY_PAUSE = os.environ.get("AI_TRNS_PARAGRAPHS_BY_PAUSE", "0").lower() in ("1", "true", "yes")
 # Transcribe Hebrew media URLs through whisper_trainer's job service at this URL (ai_trns.stt_service)
 # instead of a model here, e.g. http://<whisper_trainer>:8765. Uploads and other languages still use models/<lang>
 STT_URL = os.environ.get("AI_TRNS_STT_URL", "").rstrip("/")
@@ -54,3 +60,8 @@ GPU_INDEX = os.environ.get("AI_TRNS_GPU_INDEX", "0")
 # How often to ask for a job while the queue is empty
 POLL_S = float(os.environ.get("AI_TRNS_POLL_S", "3"))
 WORK_DIR = os.environ.get("AI_TRNS_WORK_DIR", "./work")
+# The converted audio of a media URL is kept here for AI_TRNS_AUDIO_CACHE_S seconds, for the other workers of this
+# host (the same directory in their settings): the diarize job after a transcription does not convert it again
+# (ai_trns.worker.wavcache). Unset = every job converts its audio. A 1 h lesson is ~115 MB
+AUDIO_CACHE_DIR = os.environ.get("AI_TRNS_AUDIO_CACHE_DIR", "")
+AUDIO_CACHE_S = float(os.environ.get("AI_TRNS_AUDIO_CACHE_S", "900"))

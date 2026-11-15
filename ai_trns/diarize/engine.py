@@ -16,6 +16,7 @@ Needs requirements-diarize.txt and a HuggingFace token with access to the pyanno
 """
 import logging
 import os
+import time
 from typing import Callable, Optional
 
 import numpy as np
@@ -119,7 +120,8 @@ class Diarizer:
     """pyannote pipeline, MMS_FA aligner and uroman, loaded once; parameters are passed per call"""
 
     def __init__(self, speakers_dir: str, device: str = "cuda", pipeline: str = PIPELINE,
-                 hf_token: Optional[str] = None, extra_threshold: Optional[float] = MATCH_EXTRA_THRESHOLD):
+                 hf_token: Optional[str] = None, extra_threshold: Optional[float] = MATCH_EXTRA_THRESHOLD,
+                 step: Optional[float] = None):
         import torch
         import torchaudio
         import uroman
@@ -137,6 +139,8 @@ class Diarizer:
             raise RuntimeError(f"Could not load {pipeline}: check HF_TOKEN and that its license is accepted on HF")
         self.pipeline.to(self.device)
         self.pipeline_name = pipeline
+        if step:
+            self._set_step(step)
 
         bundle = torchaudio.pipelines.MMS_FA
         self.mms = bundle.get_model(with_star=False).to(self.device)
@@ -148,6 +152,17 @@ class Diarizer:
         self.builtin_embeddings = {}
 
     # --- speakers
+
+    def _set_step(self, step: float):
+        """pyannote slides a window over the audio and embeds every speaker in every position: nearly all of its
+        time. step: the slide as a share of the window (the pipeline's own: 0.1); twice the step = half the time"""
+        inference = getattr(self.pipeline, "_segmentation", None)
+        if inference is None or not hasattr(inference, "step") or not hasattr(inference, "duration"):
+            raise RuntimeError("this pyannote pipeline has no segmentation step to set (AI_TRNS_DIARIZE_STEP)")
+        if not 0 < step <= 0.5:
+            raise ValueError("AI_TRNS_DIARIZE_STEP: a share of the window, above 0 and up to 0.5")
+        inference.step = step * inference.duration
+        log.info("segmentation step %.2f of the window (%.1f s)", step, inference.step)
 
     def _diarize(self, waveform, speaker_kwargs: dict, hook):
         """-> (turns, cluster_labels, centroids) where centroids[i] belongs to cluster_labels[i]"""
@@ -195,13 +210,13 @@ class Diarizer:
             embs.append(emb)
         return names, np.stack(embs) if embs else np.zeros((0, 0))
 
-    def _name_clusters(self, labels: list, centroids, samples: list[tuple[str, str]]) -> dict:
-        """{cluster: name} for the clusters matched to a voice sample"""
+    def _name_clusters(self, labels: list, centroids, samples: list[tuple[str, str]]) -> tuple[dict, list]:
+        """({cluster: name} for the clusters matched to a voice sample, how sure it is: mapping.voice_report)"""
         builtin = builtin_samples(self.speakers_dir)
         requested = {name for name, _ in samples}
         all_samples = [s for s in builtin if s[0] not in requested] + list(samples)
         if not all_samples or not labels:
-            return {}
+            return {}, []
         if centroids is None:
             raise ValueError("this diarization pipeline returns no speaker embeddings; samples unsupported")
         names, sample_embs = self._sample_embeddings(all_samples, {p for _, p in builtin})
@@ -209,7 +224,8 @@ class Diarizer:
         speakers, sim = mapping.best_per_speaker(names, sim)
         log.info("speaker/cluster similarity (%s): %s", speakers, np.round(sim, 3).tolist())
         matched = mapping.match_samples(sim, MATCH_THRESHOLD, self.extra_threshold)
-        return {labels[c]: speakers[s] for c, s in matched.items()}
+        return {labels[c]: speakers[s] for c, s in matched.items()}, \
+            mapping.voice_report(speakers, sim, matched, MATCH_THRESHOLD)
 
     # --- word timings
 
@@ -280,12 +296,22 @@ class Diarizer:
             part = completed / total if total and completed is not None else 1.0
             on_progress(DIARIZE_SHARE * min(1.0, (i + part) / len(PYANNOTE_STEPS)))
 
+        # seconds of each stage, into the document's stats: where a job's time goes
+        seconds, mark = {}, time.time()
+
+        def lap(stage: str):
+            nonlocal mark
+            seconds[stage], mark = round(time.time() - mark, 1), time.time()
+
         pcm = audio.load_pcm(wav_file)
         waveform = self.torch.from_numpy(pcm.copy())
+        lap("audio")
         speaker_kwargs = {k: v for k, v in (speakers or {}).items() if v is not None}
         turns, labels, centroids = self._diarize(waveform, speaker_kwargs, hook)
         log.info("diarized: %d turns, %d clusters", len(turns), len(labels))
-        named = self._name_clusters(labels, centroids, samples)
+        lap("speakers")
+        named, voices = self._name_clusters(labels, centroids, samples)
+        lap("samples")
 
         lang_code = UROMAN_LANGS.get(lang, "heb")
         labeled = []
@@ -306,6 +332,7 @@ class Diarizer:
             else:
                 labeled.extend((w, cluster, cue_idx) for w in words)
         log.info("words: %d, ctc failed on %d of %d cues", len(labeled), fallback, len(cues))
+        lap("align")
 
         names = mapping.speaker_names([c for _, c, _ in labeled if c is not None], named)
         return {
@@ -317,5 +344,6 @@ class Diarizer:
             "words": [{"word": w["word"], "start": round(w["start"], 3), "end": round(w["end"], 3),
                        "speaker": names.get(c), "cue": cue_idx} for w, c, cue_idx in labeled],
             "stats": {"speakers": len(set(names.values())), "named": len(named),
-                      "mixed_cues": mixed_cues, "vad_fallback_cues": fallback},
+                      "mixed_cues": mixed_cues, "vad_fallback_cues": fallback, "seconds": seconds,
+                      "voices": voices, "uncertain_voices": sum(v["uncertain"] for v in voices)},
         }

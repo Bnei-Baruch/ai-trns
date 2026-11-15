@@ -15,13 +15,16 @@ A worker gets transcriptions in its langs and jobs of its other engines ("engine
 A live job asked to stop ("stop") ends with what it has, as a normal result; "cancel" ends with none.
 A leased job is the worker's until the lease runs out; every heartbeat extends it. A lost
 worker's job goes back to the queue. Requests carry the worker key and the protocol version
-in headers. Stdlib only: the worker may run inside another project's locked environment.
+in headers. A 204 to a lease with the header X-Jobs-Waiting: 1 means jobs are queued that this worker
+cannot take: a worker sharing its GPU frees it for the others' workers at once instead of after its idle time.
+Stdlib only: the worker may run inside another project's locked environment.
 """
 
 VERSION = 1
 
 KEY_HEADER = "X-Worker-Key"
 VERSION_HEADER = "X-Worker-Protocol"
+WAITING_HEADER = "X-Jobs-Waiting"
 
 # Seconds a lease lasts without a heartbeat; workers send heartbeats several times per lease
 LEASE_S = 120

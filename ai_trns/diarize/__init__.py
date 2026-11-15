@@ -14,7 +14,10 @@ forced alignment, each word given a speaker. It sends back the diarization docum
       "language": "he" | ...,
       "model": str,                              # pyannote pipeline
       "words": [{"word", "start", "end", "speaker", "cue"}],
-      "stats": {"speakers", "named", "mixed_cues", "vad_fallback_cues"}
+      "stats": {"speakers", "named", "mixed_cues", "vad_fallback_cues",
+                "seconds": {"audio", "speakers", "samples", "align", "paragraphs"},   # of each stage
+                "voices": [{"speaker", "similarity", "named", "next", "uncertain"}],     # mapping.voice_report
+                "uncertain_voices": int}   # > 0: the speakers' names are worth a look
     }
 
 speaker: a known speaker's name ("Rav") or SPEAKER_NN, None only when no speech was found;

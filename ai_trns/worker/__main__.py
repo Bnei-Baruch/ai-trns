@@ -18,7 +18,7 @@ import time
 from typing import Optional
 
 from .. import audio, clip, protocol
-from . import config
+from . import config, wavcache
 from .client import ApiError, Client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -53,7 +53,8 @@ class Models:
     def diarizer(self):
         from ..diarize.engine import Diarizer
         return self._load(DIARIZE, lambda: Diarizer(config.SPEAKERS_DIR, config.DEVICE, config.DIARIZE_PIPELINE,
-                                                    config.HF_TOKEN, config.DIARIZE_EXTRA_THRESHOLD))
+                                                    config.HF_TOKEN, config.DIARIZE_EXTRA_THRESHOLD,
+                                                    config.DIARIZE_STEP))
 
     def unload_if_idle(self):
         if self.loaded and time.time() - self.last_used > config.IDLE_UNLOAD_S:
@@ -190,14 +191,18 @@ def add_paragraphs(doc: dict) -> None:
     if not text:
         doc["paragraph_starts"] = []
         return
+    t0 = time.time()
     try:
         reply = client.split(config.PARAGRAPHS_URL, text, config.PARAGRAPHS_KEY)
     except RuntimeError as e:
         log.warning("paragraphs: %s", e)
         stats["paragraphs_error"] = str(e)
         return
+    # the whole call, the model's loading included (the service's own "seconds" is the generation only)
+    stats.setdefault("seconds", {})["paragraphs"] = round(time.time() - t0, 1)
     starts = build.starts_from_sentences(index, offsets, reply["sentences"], reply["breaks"])
-    doc["paragraph_starts"] = build.thin_starts(doc["words"], starts, config.PARAGRAPHS_MIN_WORDS)
+    doc["paragraph_starts"] = build.thin_starts(doc["words"], starts, config.PARAGRAPHS_MIN_WORDS,
+                                                 config.PARAGRAPHS_BY_PAUSE)
     doc["paragraphs_model"] = "mdb-lora " + (reply.get("adapter") or "paragraphing")
     log.info("paragraphs: %d breaks in %s s", len(doc["paragraph_starts"]), reply.get("seconds"))
 
@@ -292,18 +297,26 @@ def run_locally(client: Client, models: Models, job: dict, job_dir: str, beat: "
         client.download(job["source"]["upload"], source)
     else:
         source = job["source"]["url"]
-    duration = audio.get_duration(source)
-    if duration == 0:
-        raise RuntimeError("could not determine audio duration")
-    # a clip: only its part of the audio; the document in media time
-    window = clip.window(params["clip"], duration) if params.get("clip") else None
-    start, end = window or (0.0, duration)
     wav_file = os.path.join(job_dir, "audio.wav")
-    if not audio.convert_to_wav(source, wav_file, end - start,
-                                lambda p: beat.update("converting", CONVERT_SHARE * p),
-                                beat.cancelled.is_set, start=start, length=end - start if window else None):
-        log.info("job %s cancelled", job_id)
-        return None
+    # whole media by its URL: another worker of this host may have converted it already
+    shared = config.AUDIO_CACHE_DIR if "url" in job["source"] and not params.get("clip") else ""
+    if shared and wavcache.take(shared, source, wav_file, config.AUDIO_CACHE_S):
+        log.info("job %s: audio already converted by another job", job_id)
+        window, start = None, 0.0
+    else:
+        duration = audio.get_duration(source)
+        if duration == 0:
+            raise RuntimeError("could not determine audio duration")
+        # a clip: only its part of the audio; the document in media time
+        window = clip.window(params["clip"], duration) if params.get("clip") else None
+        start, end = window or (0.0, duration)
+        if not audio.convert_to_wav(source, wav_file, end - start,
+                                    lambda p: beat.update("converting", CONVERT_SHARE * p),
+                                    beat.cancelled.is_set, start=start, length=end - start if window else None):
+            log.info("job %s cancelled", job_id)
+            return None
+        if shared:
+            wavcache.put(shared, source, wav_file, config.AUDIO_CACHE_S)
     from ..transcriber import Cancelled
     try:
         if params.get("kind") == DIARIZE:
@@ -322,6 +335,12 @@ def run_locally(client: Client, models: Models, job: dict, job_dir: str, beat: "
         return None
     models.last_used = time.time()
     return doc
+
+
+def stage_seconds(doc: dict) -> str:
+    """For the log: the seconds of each stage a document's stats have (a diarize job's)"""
+    seconds = (doc.get("stats") or {}).get("seconds") or {}
+    return "".join(f", {stage} {s:.0f} s" for stage, s in seconds.items())
 
 
 RESULT_TRIES, RESULT_RETRY_S = 6, 10.0
@@ -345,6 +364,7 @@ def run_job(client: Client, models: Models, job: dict, shutdown: Optional[thread
     job_id, params = job["id"], job["params"]
     job_dir = os.path.join(config.WORK_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
+    t0 = time.time()
     try:
         with Heartbeat(client, job_id) as beat:
             if params.get("kind") == LIVE:
@@ -362,7 +382,8 @@ def run_job(client: Client, models: Models, job: dict, shutdown: Optional[thread
         if doc is None:
             return
         send_result(client, job_id, doc)
-        log.info("job %s done: %.0f s of audio, %d words", job_id, doc["duration_s"], len(doc["words"]))
+        log.info("job %s done in %.0f s: %.0f s of audio, %d words%s", job_id, time.time() - t0, doc["duration_s"],
+                 len(doc["words"]), stage_seconds(doc))
     except ApiError as e:
         # 409: the job was cancelled or given to another worker meanwhile; nothing to report
         log.warning("job %s: %s", job_id, e)
@@ -410,7 +431,12 @@ def main(stop: Optional[threading.Event] = None):
                 # wrong key or protocol version: retrying fast will not help
                 stop.wait(60)
         if job is None:
-            models.unload_if_idle()
+            if client.jobs_waiting and config.MIN_FREE_GPU_MB > 0:
+                # the GPU is shared (AI_TRNS_MIN_FREE_GPU_MB) and others' jobs are queued: they may be
+                # waiting for this worker's memory, e.g. the diarize job that follows a transcription
+                models.unload()
+            else:
+                models.unload_if_idle()
             stop.wait(config.POLL_S)
             continue
         params = job["params"]
