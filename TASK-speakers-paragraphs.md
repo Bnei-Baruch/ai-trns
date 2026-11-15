@@ -31,7 +31,7 @@
   и `stt-api.service` (uvicorn :8765, 4,6 ГБ). **`/diarize/*` живой только здесь, в stt-api** (:8765, оригинал).
   **mdb-lora:** `/home/mdb-lora`, веса абзацев — `adapters/paragraphing/outputs/paragraphing` (+ checkpoint-291);
   **HTTP-сервиса нет**, только CLI `predict.py` (conda env `mdb-lora`, Qwen2.5-3B + LoRA). Свободной памяти на `stt` под 3B нет.
-- **`ai-tools`** (root@10.66.24.55, RTX 2080 8 ГБ, драйвер 535): `ai-trns-api`, `ai-trns-worker` (engines `transcribe`),
+- **`ai-tools`** (RTX 2080 8 ГБ, драйвер 535): `ai-trns-api`, `ai-trns-worker` (engines `transcribe`),
   `ai-trns-live-worker` (engines `live`), `exec-api`, `ollama` (bge-m3). В простое GPU почти свободна (~0,1 ГБ).
   **`/diarize/*` в openapi есть, но воркера с движком `diarize` нет** → задача встанет в очередь навсегда.
   Абзацев здесь нет.

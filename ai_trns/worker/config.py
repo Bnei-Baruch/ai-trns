@@ -38,7 +38,7 @@ PARAGRAPHS_MIN_WORDS = int(os.environ.get("AI_TRNS_PARAGRAPHS_MIN_WORDS", "0") o
 # (scripts/paragraphs_eval/methods.py, adapter with "pause": true)
 PARAGRAPHS_BY_PAUSE = os.environ.get("AI_TRNS_PARAGRAPHS_BY_PAUSE", "0").lower() in ("1", "true", "yes")
 # Transcribe Hebrew media URLs through whisper_trainer's job service at this URL (ai_trns.stt_service)
-# instead of a model here, e.g. http://10.66.1.53:8765. Uploads and other languages still use models/<lang>
+# instead of a model here, e.g. http://<whisper_trainer>:8765. Uploads and other languages still use models/<lang>
 STT_URL = os.environ.get("AI_TRNS_STT_URL", "").rstrip("/")
 # The service not reachable (connection refused, 502-504 when the job is submitted): transcribe on models/<lang>
 # instead of failing the job. Its document then names the local model

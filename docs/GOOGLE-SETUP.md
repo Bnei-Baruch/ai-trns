@@ -91,7 +91,7 @@ ai-trns создаёт документ при создании live-задач�
      участник (Content manager), её id — в `AI_TRNS_GOOGLE_FOLDER`.
    - **Обычный аккаунт (authorized_user):** JSON с `client_id`, `client_secret`, `refresh_token` и scope
      `documents` + `drive` — документы лягут в «Мой диск» этого аккаунта.
-3. JSON — на `ai-tools` (10.66.24.55) в `/home/ai-trns/google-credentials.json`, владелец `ai-trns`, права 600
+3. JSON — на `ai-tools` в `/home/ai-trns/google-credentials.json`, владелец `ai-trns`, права 600
    (копировать `scp`, не через чат).
 4. `ai-trns-api.env`:
    ```

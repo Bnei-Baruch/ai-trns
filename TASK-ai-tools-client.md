@@ -24,7 +24,7 @@
 
 ## Что сделать
 1. Довести и закоммитить текущую работу (review / diarize / tadiff / docdiff), тесты зелёные.
-2. Задеплоить на `ai-tools` (10.66.24.55) как в `docs/ARCHITECTURE.md` (rsync в `/home/ai-trns/app`, рестарт
+2. Задеплоить на `ai-tools` как в `docs/ARCHITECTURE.md` (rsync в `/home/ai-trns/app`, рестарт
    `ai-trns-api` и `ai-trns-worker`). exec-api и ollama не трогать.
 3. В env API на сервере проверить/выставить:
    ```

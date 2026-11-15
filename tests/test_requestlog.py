@@ -12,7 +12,7 @@ def entries(api_config):
 
 
 def test_every_request_is_logged_with_the_caller(client, api_config):
-    client.get("/health", headers={"X-Forwarded-For": "1.2.3.4, 10.0.0.1", "User-Agent": "probe"})
+    client.get("/health", headers={"X-Forwarded-For": "1.2.3.4, 192.0.2.10", "User-Agent": "probe"})
     client.get("/jobs", headers=H)
     client.get("/jobs")
     health, jobs, rejected = entries(api_config)[-3:]

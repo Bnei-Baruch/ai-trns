@@ -3,7 +3,7 @@ Request log: every request to the API, one JSON line each, in AI_TRNS_LOG_DIR/re
 midnight (the old one becomes requests.log.YYYY-MM-DD), AI_TRNS_LOG_DAYS old files are kept (7: a week), older ones
 are removed. Empty AI_TRNS_LOG_DIR: off.
 
-    {"time": "2026-11-08T12:00:00+00:00", "ip": "1.2.3.4", "peer": "10.66.24.1", "method": "POST", "path": "/markup",
+    {"time": "2026-11-08T12:00:00+00:00", "ip": "1.2.3.4", "peer": "192.0.2.10", "method": "POST", "path": "/markup",
      "query": "", "status": 202, "ms": 120, "who": "user@x", "ua": "...", "origin": "https://...", "note": "uid=..."}
 
 ip -- the client as the proxy (Angie) reports it: X-Real-IP (the proxy sets it, a client cannot), else

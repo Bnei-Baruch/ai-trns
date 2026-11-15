@@ -177,7 +177,7 @@ ai-trns/
 ### Распознавание сервисом whisper_trainer (`ai_trns/stt_service.py`)
 
 Временно, пока свой движок whisper_trainer не собран (раздел 8), транскрипт берётся у их прод-сервиса
-`http://10.66.1.53:8765` (`transcription_service.py`), а не у модели на воркере. С ai-tools он доступен напрямую,
+`http://<whisper_trainer>:8765` (`transcription_service.py`), а не у модели на воркере. С ai-tools он доступен напрямую,
 без Angie и ключа. Включается настройкой воркера `AI_TRNS_STT_URL`.
 
 - Воркер не качает и не декодирует аудио: отдаёт сервису URL задачи и ждёт его SRT. Diarize по-прежнему идёт на своём GPU.
@@ -204,7 +204,7 @@ ai-trns/
 
 ## 8. Связь с whisper_trainer и stt-api
 
-**whisper_trainer** (github.com/orendar/whisper_trainer) — дообучение модели, оценка качества и собственный прод-сервис распознавания `transcription_service.py` на 10.66.1.53:8765. Это и есть «upstream», к которому сейчас проксирует stt-api.
+**whisper_trainer** (github.com/orendar/whisper_trainer) — дообучение модели, оценка качества и собственный прод-сервис распознавания `transcription_service.py` на `<whisper_trainer>:8765`. Это и есть «upstream», к которому сейчас проксирует stt-api.
 
 Что взято в ai-trns:
 - веса модели — через Hub;
@@ -289,7 +289,7 @@ ai-trns/
 
 ## 9. Где что развёрнуто
 
-### `ai-tools` — 10.66.24.55 (ssh `root@10.66.24.55`)
+### `ai-tools` (ssh `root@<ai-tools>`; адрес — в секрете `DEPLOY_HOST`)
 
 Ubuntu 24.04, 12 ядер, 15 ГБ RAM, RTX 2080 8 ГБ (Turing), драйвер 535 (CUDA 12.2).
 
@@ -320,11 +320,11 @@ Ubuntu 24.04, 12 ядер, 15 ГБ RAM, RTX 2080 8 ГБ (Turing), драйвер
 хосте ключ только для прохода к SSH сервера (`command=nologin`, `permitopen`), на сервере — root только с него (`from=`).
 Вручную, как раньше:
 ```bash
-rsync -a --delete --exclude .git --exclude __pycache__ ./ root@10.66.24.55:/home/ai-trns/app/
-ssh root@10.66.24.55 'chown -R ai-trns: /home/ai-trns/app && systemctl restart ai-trns-api ai-trns-worker'
+rsync -a --delete --exclude .git --exclude __pycache__ ./ root@<ai-tools>:/home/ai-trns/app/
+ssh root@<ai-tools> 'chown -R ai-trns: /home/ai-trns/app && systemctl restart ai-trns-api ai-trns-worker'
 ```
 
-### `stt` — 10.65.4.100 (ssh `stt`)
+### `stt` (ssh `stt`)
 
 Rocky Linux 9.5 (glibc 2.34), RTX 3070 8 ГБ, 15 ГБ RAM, CUDA 13.1.
 
