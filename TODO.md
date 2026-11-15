@@ -30,13 +30,13 @@
       авторизация, настоящий воркер против настоящего API-сервера.
 
 ### Развёрнуто
-- [x] `ai-tools` (10.66.24.55): systemd `ai-trns-api` (порт 8766) и `ai-trns-worker` (RTX 2080) от пользователя
+- [x] `ai-tools`: systemd `ai-trns-api` (порт 8766) и `ai-trns-worker` (RTX 2080) от пользователя
       `ai-trns` в `/home/ai-trns`. Проверено: урок 41 мин → SRT за 30 с. exec-api и ollama не тронуты.
-- [x] `stt` (10.65.4.100): тестовая установка `/home/ai-trns` и замеры на RTX 3070 (105 мин за ~50 с, 3.4 ГБ).
+- [x] `stt`: тестовая установка `/home/ai-trns` и замеры на RTX 3070 (105 мин за ~50 с, 3.4 ГБ).
 
 ### Анализ
 - [x] whisper_trainer: что в нём относится к использованию модели. Их `transcription_service.py` — это и есть
-      upstream 10.66.1.53:8765, на который проксирует stt-api.
+      upstream `<whisper_trainer>:8765`, на который проксирует stt-api.
 - [x] Сравнение SRT whisper_trainer / stt-api (diarize) / старый ai-trns. Сравнение с их продом: разбивка
       совпадает, расхождение около 4% слов идёт от их декодера.
 - [x] Сеть: `stt → ai-tools` закрыто, `ai-tools → stt` открыто.
@@ -44,7 +44,7 @@
 ## Дальше
 
 ### Запуск для пользователей
-- [x] Angie на `ngx.kab.info`: location `https://<ai-tools>/ai-trns/` → `10.66.24.55:8766`
+- [x] Angie: location `https://<ai-tools>/ai-trns/` → `<ai-tools>:8766`
       (2026-10-20, бэкап `/root/ai-tools.conf.bak.20261020152425`). `/health` отвечает, `/jobs` без токена — 401.
 - [x] Задеплоен `b297acc` (ветка `review`) в `ai-tools:/home/ai-trns/app` (2026-10-20): `/review`, `/diarize`, `/tadiff`,
       `/docdiff` в openapi; CORS `https://<ai-tools>,http://localhost:3000` с `PUT`; `AI_TRNS_REVIEW_DIR=/home/ai-trns/review`;
@@ -59,7 +59,7 @@
 - [ ] Влить ветки ai-trns (`review` → `cleanup-old`) в master. `whisper_fullfile_cli.py` и exec-api убраны (2026-11-04).
 
 ### whisper_trainer (полный прод-конвейер)
-- [x] Временно: транскрипт из их сервиса `10.66.1.53:8765` (`ai_trns/stt_service.py`, `AI_TRNS_STT_URL` у воркера),
+- [x] Временно: транскрипт из их сервиса `<whisper_trainer>:8765` (`ai_trns/stt_service.py`, `AI_TRNS_STT_URL` у воркера),
       SRT как есть; загрузка файлов для transcribe/tadiff/docdiff выключена (`AI_TRNS_TRANSCRIBE_UPLOADS=0`).
 - [x] Задеплоено на ai-tools 2026-10-20 (рабочее дерево поверх `b297acc`, бэкап `app.bak.20261020143827` и env):
       URL-задача `cdn.kabbalahmedia.info/3RhEpAgW` → SRT байт в байт как у сервиса (858 реплик), загрузка файла → 422.
@@ -137,7 +137,7 @@
 - [ ] Live: метки и абзацы (шаг 2) — не начато, план и препятствия в TASK-файле.
 
 ### Сервис whisper_trainer
-- [ ] `10.66.1.53:8765` 2026-11-04 отказывает в соединении (хост жив). Пока он лежит, воркер распознаёт своей моделью
+- [ ] `<whisper_trainer>:8765` 2026-11-04 отказывает в соединении (хост жив). Пока он лежит, воркер распознаёт своей моделью
       (`AI_TRNS_STT_FALLBACK`), в документе — имя локальной модели. Сообщить владельцам whisper_trainer.
 
 ### Мелочи
