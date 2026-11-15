@@ -60,7 +60,5 @@ REVIEW_DIR = os.environ.get("AI_TRNS_REVIEW_DIR", "./review")
 # a new file at midnight, LOG_DAYS old files kept; empty LOG_DIR = off
 LOG_DIR = os.environ.get("AI_TRNS_LOG_DIR", "./logs")
 LOG_DAYS = int(os.environ.get("AI_TRNS_LOG_DAYS", "7"))
-# lesson markup (ai_trns.api.markup): its runs and documents, kept without the jobs' TTL
-MARKUP_DIR = os.environ.get("AI_TRNS_MARKUP_DIR", "./markup")
 # The model reviewers are told they review; default: the model of the newest transcribed lesson
 REVIEW_MODEL = os.environ.get("AI_TRNS_REVIEW_MODEL", "")

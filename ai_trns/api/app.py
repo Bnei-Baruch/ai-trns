@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, Response
 
 from .. import protocol
 from ..subtitles import render
-from . import config, diarize, live, markup, results, review, tadiff
+from . import config, diarize, live, results, review, tadiff
 from .auth import Principal, can_see, principal
 from .requestlog import RequestLog
 from .jobs import CANCELLED, DONE, ERROR, QUEUED, RUNNING, TRANSCRIBE, JobStore, kind_of
@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
     store = JobStore()
     hubs = live.Live()
     stop = threading.Event()
-    # set when a job finishes: the chains (review, markup) move on now, not at the next tick
+    # set when a job finishes: the review chain moves on now, not at the next tick
     wake = threading.Event()
 
     def maintenance():
@@ -63,10 +63,6 @@ async def lifespan(app: FastAPI):
                 review.sync_all(store)
             except Exception:
                 log.exception("review: sync failed")
-            try:
-                markup.sync_all(store)
-            except Exception:
-                log.exception("markup: sync failed")
             hubs.cleanup(store)
             if time.time() - last_cleanup > 3600:
                 last_cleanup = time.time()
@@ -97,7 +93,6 @@ app.include_router(tadiff.tadiff)
 app.include_router(tadiff.docdiff)
 app.include_router(diarize.router)
 app.include_router(live.router)
-app.include_router(markup.router)
 
 
 def require_worker(request: Request):
