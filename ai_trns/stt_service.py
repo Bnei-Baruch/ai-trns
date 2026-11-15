@@ -1,5 +1,5 @@
 """
-Transcription by whisper_trainer's job service (transcription_service.py, e.g. http://10.66.1.53:8765)
+Transcription by whisper_trainer's job service (transcription_service.py, e.g. http://<whisper_trainer>:8765)
 instead of a model on this host. Stdlib only.
 
     POST /transcribe {"urls": [url]} -> 202 + Location: /jobs/<id>
